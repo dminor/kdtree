@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#include <stdio.h>
+#include <float.h>
 #include <string.h>
 
 #include "kdtree.h"
@@ -94,10 +94,9 @@ struct Kdnode *build_kdtree(struct Point *pts, size_t pt_count, size_t depth, si
 {
     struct Kdnode *result = (struct Kdnode *)malloc(sizeof(struct Kdnode));
 
-    printf("%d %d\n", pt_count, depth);
-
     if (pt_count == 1) {
         //leaf node, store point and return
+        result->children = 1;
         result->left = result->right = 0;
         memcpy(&result->pt, pts, sizeof(struct Point));
     } else {
@@ -109,14 +108,12 @@ struct Kdnode *build_kdtree(struct Point *pts, size_t pt_count, size_t depth, si
         size_t median_index = (pt_count / 2) >> 1 << 1;
         double median = select_order(median_index, pts, pt_count, dim, coord);
 
-        printf("%.3f %d %d\n", median, median_index, pt_count - median_index);
-
         //recursively build tree
-        result->left = build_kdtree(pts, median_index + 1, depth + 1, dim);
-        result->left->parent = result;
-
+        result->left = build_kdtree(pts, median_index + 1, depth + 1, dim); 
         result->right = build_kdtree(&pts[median_index + 1], pt_count - median_index - 1, depth + 1, dim);
-        result->right->parent = result;
+
+        //keep track of number of children
+        result->children = result->left->children + result->right->children;
 
         //store median value
         memset(&result->pt.coord, dim * sizeof(double), 0);
@@ -124,4 +121,155 @@ struct Kdnode *build_kdtree(struct Point *pts, size_t pt_count, size_t depth, si
     } 
 
     return result;
+}
+
+static int point_in_range(struct Point *p, double *range, size_t dim)
+{
+    for (int i = 0; i < dim; ++i) {
+        if (range[i*2] > p->coord[i] || range[i*2+1] < p->coord[i]) return 0;
+    }
+
+    return 1; 
+}
+
+static int range_contains_region(double *range, double *region, size_t dim)
+{ 
+    for (int i = 0; i < dim; ++i) {
+        if (range[i*2] > region[i*2] || range[i*2+1] < region[i*2+1]) return 0;
+        if (range[i*2] > region[i*2+1] || range[i*2+1] < region[i*2]) return 0;
+    }
+
+    return 1; 
+}
+
+static int region_intersects_range(double *range, double *region, size_t dim)
+{
+    int intersects = 0;
+    for (int i = 0; i < dim; ++i) {
+        if (range[i*2] < region[i*2] || range[i*2+1] > region[i*2+1]) intersects = 1; 
+        if (range[i*2] < region[i*2+1] || range[i*2+1] > region[i*2]) intersects = 1; 
+    }
+
+    return intersects; 
+}
+
+static void report_subtree(struct Kdnode *tree, struct KdtreeQueryResult *qr)
+{ 
+    if (tree->left == 0 && tree->right == 0) {
+        //leaf, add to result
+        qr->pts[qr->count++] = tree->pt; 
+    } else {
+        //recurse through tree
+        report_subtree(tree->left, qr);
+        report_subtree(tree->right, qr);
+    }
+}
+
+static struct KdtreeQueryResult range_query(struct Kdnode *tree, double *range, double *region, size_t dim, size_t depth)
+{
+    struct KdtreeQueryResult qr;
+
+    //leaf node
+    if (tree->left == 0 && tree->right == 0) { 
+        if (point_in_range(&tree->pt, range, dim)) {
+            qr.count = 1;
+            qr.pts = malloc(sizeof(struct Point));
+            memcpy(qr.pts, &tree->pt, sizeof(struct Point));
+        } else {
+            qr.count = 0;
+        } 
+    } else {
+
+        struct KdtreeQueryResult lqr, rqr; 
+        double split_value = tree->pt.coord[(depth + 1) % dim];
+
+        //left subtree -- update region
+        lqr.count = 0; 
+        int changed_index = 2 * (depth % dim) + 1;
+
+        double changed_value = region[changed_index];    
+        region[changed_index] = split_value; 
+
+        if (range_contains_region(range, region, dim)) {
+            if (tree->left->children) {
+                lqr.count = 0; 
+                lqr.pts = malloc(tree->left->children*sizeof(struct Point));
+                report_subtree(tree->left, &lqr);
+            }
+        } else if (region_intersects_range(region, range, dim)) {
+            lqr = range_query(tree->left, range, region, dim, depth+1); 
+        }
+
+        //restore region 
+        region[changed_index] = changed_value; 
+
+        //right subtree -- update region 
+        rqr.count = 0; 
+
+        changed_index = 2 * (depth % dim);
+        changed_value = region[changed_index];    
+        region[changed_index] = split_value; 
+
+        if (range_contains_region(range, region, dim)) {
+            if (tree->right->children) {
+                rqr.count = 0;
+                rqr.pts = malloc(tree->right->children*sizeof(struct Point));
+                report_subtree(tree->right, &rqr);
+            }
+        } else if (region_intersects_range(region, range, dim)) {
+            rqr = range_query(tree->right, range, region, dim, depth+1); 
+        }
+
+        //restore region 
+        region[changed_index] = changed_value; 
+
+        //collect results
+        qr.count = lqr.count + rqr.count;
+
+        if (qr.count) {
+
+            qr.pts = malloc(qr.count * sizeof(struct Point));
+
+            //copy points to result
+            int qr_idx = 0;
+            for (int i = 0; i < lqr.count; ++i) {
+                qr.pts[qr_idx++] = lqr.pts[i];
+            }
+
+            for (int i = 0; i < rqr.count; ++i) {
+                qr.pts[qr_idx++] = rqr.pts[i];
+            }
+
+            //free sub-result memory
+            if (lqr.count) free(lqr.pts);
+            if (rqr.count) free(rqr.pts);
+        } 
+    }
+
+    return qr; 
+}
+
+struct KdtreeQueryResult kdtree_range_query(struct Kdnode *tree, double *range, size_t dim)
+{
+    //set up region
+    double *region = malloc(2 * dim * sizeof(double));
+    for (int i = 0; i < dim; ++i) {
+        region[i] = -DBL_MAX;
+        region[i + 1] = DBL_MAX;
+    }
+
+    //run query
+    struct KdtreeQueryResult qr = range_query(tree, range, region, dim, 0);
+
+    //clean up and return result;
+    free(region);
+    return qr;
+}
+
+struct KdtreeQueryResult kdtree_knn(struct Kdnode *tree, size_t k, double *pt, size_t dim)
+{ 
+    //assume k == 1 for now
+    struct KdtreeQueryResult qr;
+
+    return qr;
 }

@@ -1,4 +1,6 @@
-/*
+#!/usr/bin/lua
+
+--[[
 Copyright (c) 2010 Daniel Minor 
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -18,32 +20,27 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-*/
+--]]
 
-#ifndef KD_TREE_H_
-#define KD_TREE_H_
+-- generate random query rectangles
+if #arg ~= 3 then
+    print('usage: generate_range_queries.lua <count> <scale> <output>')
+    return
+end
 
-#include <stdlib.h>
+q_count = arg[1]
+scale = arg[2]
+filename = arg[3]
 
-struct Point {
-    double coord[2];
-    void *v;
-};
+f = assert(io.open(filename, 'w'))
+f:write(q_count .. '\n')
 
-struct Kdnode {
-    struct Kdnode *left, *right;
-    struct Point pt;
-    size_t children;
-};
+for i=0,q_count do
+    x = math.random() * scale
+    y = math.random() * scale
+    w = math.random() * scale
+    h = math.random() * scale
+    f:write(x .. ', ' .. x + w .. ', ' .. y .. ', ' .. y + h .. '\n')
+end
 
-struct KdtreeQueryResult {
-    size_t count;
-    struct Point *pts;
-};
-
-struct Kdnode *build_kdtree(struct Point *pts, size_t pt_count, size_t depth, size_t dim);
-struct KdtreeQueryResult kdtree_range_query(struct Kdnode *tree, double *range, size_t dim); 
-struct KdtreeQueryResult kdtree_knn(struct Kdnode *tree, size_t k, double *pt, size_t dim);
-
-#endif
-
+f:close()
