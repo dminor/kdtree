@@ -36,14 +36,20 @@ struct Kdnode {
     size_t children;
 };
 
-struct KdtreeQueryResult {
+struct KdtreeRangeQueryResult {
     size_t count;
     struct Point *pts;
 };
 
+struct KdtreeKNNResult {
+    size_t count;
+    struct Point *pts;
+    double *distances;
+};
+
 struct Kdnode *build_kdtree(struct Point *pts, size_t pt_count, size_t depth, size_t dim);
-struct KdtreeQueryResult kdtree_range_query(struct Kdnode *tree, double *range, size_t dim); 
-struct KdtreeQueryResult kdtree_knn(struct Kdnode *tree, size_t k, double *pt, size_t dim);
+struct KdtreeRangeQueryResult kdtree_range_query(struct Kdnode *tree, double *range, size_t dim); 
+struct KdtreeKNNResult kdtree_knn(struct Kdnode *tree, size_t k, double *pt, size_t dim);
 
 #endif
 

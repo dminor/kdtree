@@ -24,6 +24,7 @@ THE SOFTWARE.
 #include <string.h>
 
 #include "kdtree.h"
+#include "priority_queue.h"
 
 int pt_lt(size_t dim, size_t coord, struct Point a, struct Point b)
 {
@@ -153,7 +154,7 @@ static int region_intersects_range(double *range, double *region, size_t dim)
     return intersects; 
 }
 
-static void report_subtree(struct Kdnode *tree, struct KdtreeQueryResult *qr)
+static void report_subtree(struct Kdnode *tree, struct KdtreeRangeQueryResult *qr)
 { 
     if (tree->left == 0 && tree->right == 0) {
         //leaf, add to result
@@ -165,9 +166,9 @@ static void report_subtree(struct Kdnode *tree, struct KdtreeQueryResult *qr)
     }
 }
 
-static struct KdtreeQueryResult range_query(struct Kdnode *tree, double *range, double *region, size_t dim, size_t depth)
+static struct KdtreeRangeQueryResult range_query(struct Kdnode *tree, double *range, double *region, size_t dim, size_t depth)
 {
-    struct KdtreeQueryResult qr;
+    struct KdtreeRangeQueryResult qr;
 
     //leaf node
     if (tree->left == 0 && tree->right == 0) { 
@@ -180,7 +181,7 @@ static struct KdtreeQueryResult range_query(struct Kdnode *tree, double *range, 
         } 
     } else {
 
-        struct KdtreeQueryResult lqr, rqr; 
+        struct KdtreeRangeQueryResult lqr, rqr; 
         double split_value = tree->pt.coord[(depth + 1) % dim];
 
         //left subtree -- update region
@@ -249,7 +250,7 @@ static struct KdtreeQueryResult range_query(struct Kdnode *tree, double *range, 
     return qr; 
 }
 
-struct KdtreeQueryResult kdtree_range_query(struct Kdnode *tree, double *range, size_t dim)
+struct KdtreeRangeQueryResult kdtree_range_query(struct Kdnode *tree, double *range, size_t dim)
 {
     //set up region
     double *region = malloc(2 * dim * sizeof(double));
@@ -259,17 +260,64 @@ struct KdtreeQueryResult kdtree_range_query(struct Kdnode *tree, double *range, 
     }
 
     //run query
-    struct KdtreeQueryResult qr = range_query(tree, range, region, dim, 0);
+    struct KdtreeRangeQueryResult qr = range_query(tree, range, region, dim, 0);
 
     //clean up and return result;
     free(region);
     return qr;
 }
 
-struct KdtreeQueryResult kdtree_knn(struct Kdnode *tree, size_t k, double *pt, size_t dim)
+double pt_node_distance(double *p1, struct Kdnode *node, size_t dim)
+{
+    struct Point *p2 = &node->pt;
+
+    double d = 0.0;
+    if (node->left == 0 && node->right == 0) {
+        for (int i = 0; i < dim; ++i) {
+            d += (p1[i]-p2->coord[i]) * (p1[i]-p2->coord[i]); 
+        } 
+    } else { 
+        for (int i = 0; i < dim; ++i) { 
+            d -= (p1[i]-p2->coord[(i - 1) % dim]) * (p1[i]-p2->coord[(i - 1) % dim]); 
+        }
+    }
+
+    return d; 
+} 
+
+struct KdtreeKNNResult kdtree_knn(struct Kdnode *tree, size_t k, double *pt, size_t dim)
 { 
-    //assume k == 1 for now
-    struct KdtreeQueryResult qr;
+    struct KdtreeKNNResult qr;
+    qr.pts = malloc(k * sizeof(struct Point));
+    qr.distances = malloc(k * sizeof(double));
+
+    struct PriorityQueue *pq = build_priority_queue(k << 2);
+    priority_queue_push(pq, 0.0, tree);
+
+    size_t nfound = 0;
+    while (priority_queue_length(pq) && nfound < k) {
+
+        struct PriorityQueueEntry e = priority_queue_pop(pq);
+
+        struct Kdnode *node = (struct Kdnode *)e.data;
+        if (node->left == 0 && node->right == 0) {
+
+            qr.pts[nfound] = node->pt;
+            qr.distances[nfound] = e.priority;
+            ++nfound;
+
+        } else {
+            double d = pt_node_distance(pt, node->left, dim); 
+            priority_queue_push(pq, d, node->left);
+
+            d = pt_node_distance(pt, node->right, dim);
+            priority_queue_push(pq, d, node->right); 
+        }
+
+    } 
+    priority_queue_free(pq);
+
+    qr.count = nfound;
 
     return qr;
 }
