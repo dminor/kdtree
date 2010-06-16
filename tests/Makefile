@@ -1,9 +1,11 @@
 
-DIRS = range-query render-tree
+DIRS = range-query render-tree heapsort knn
 
 all:
 	for dir in $(DIRS); do cd $$dir; make; cd ..; done
 
+clean:
+	for dir in $(DIRS); do cd $$dir; make clean; cd ..; done
 
 
 

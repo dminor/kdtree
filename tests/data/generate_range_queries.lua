@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 --]]
 
+math.randomseed(os.time())
+
 -- generate random query rectangles
 if #arg ~= 3 then
     print('usage: generate_range_queries.lua <count> <scale> <output>')

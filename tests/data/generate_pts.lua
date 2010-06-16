@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 --]]
 
+math.randomseed(os.time())
+
 -- generate random points centered around (0, 0) 
 if #arg ~= 3 then
     print('usage: generate_pts.lua <point count> <scale> <output>')
