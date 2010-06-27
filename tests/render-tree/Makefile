@@ -1,16 +1,16 @@
 
 INCS = -I../../include 
-LIBS = -lkdtree
-CFLAGS = -std=gnu99
-LDFLAGS = -L../../bin 
+LIBS = 
+CFLAGS = 
+LDFLAGS = 
 OBJS = render_tree.o
 TARGET = ../../bin/render-tree
 
 all: $(OBJS)
-	gcc $(LDFLAGS) $(LIBS) $(OBJS) -o $(TARGET) 
+	g++ $(LDFLAGS) $(LIBS) $(OBJS) -o $(TARGET) 
 
-.c.o:
-	gcc $(INCS) $(CFLAGS) -c $< -o $@
+.cpp.o:
+	g++ $(INCS) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm *.o $(TARGET) 

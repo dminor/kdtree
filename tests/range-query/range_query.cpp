@@ -24,32 +24,23 @@ THE SOFTWARE.
 
 #include "kdtree.h"
 
-static int point_in_range(struct Point *p, double *range, size_t dim)
+typedef double Point[2];
+
+static int point_in_range(Point *p, double *range, size_t dim)
 {
     for (int i = 0; i < dim; ++i) {
-        if (range[i*2] > p->coord[i] || range[i*2+1] < p->coord[i]) return 0;
+        if (range[i*2] > (*p)[i] || range[i*2+1] < (*p)[i]) return 0;
     }
 
     return 1; 
 } 
 
-struct KdtreeQueryResult linear_range_query(int pt_count, struct Point *pts, double *range)
-{
-    size_t count = 0;
+std::vector<Point *> linear_range_query(int pt_count, Point *pts, double *range)
+{ 
+    std::vector<Point *> qr;
 
     for (int i = 0; i < pt_count; ++i) {
-        if (point_in_range(&pts[i], range, 2)) ++count;
-    }
-
-    struct KdtreeQueryResult qr;
-    qr.count = 0;
-
-    if (count > 0) {
-        qr.pts = malloc(count * sizeof(struct Point));
-
-        for (int i = 0; i < pt_count; ++i) {
-            if (point_in_range(&pts[i], range, 2)) qr.pts[qr.count++] = pts[i];
-        }
+        if (point_in_range(&pts[i], range, 2)) qr.push_back(&pts[i]);
     }
 
     return qr;
@@ -79,13 +70,13 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    struct Point *pts = (struct Point *)malloc(pt_count * sizeof(struct Point));
+    Point *pts = new Point[pt_count]; 
 
     double x, y;
     for (int i = 0; i < pt_count; ++i) {
         fscanf(f, "%lf, %lf", &x, &y);
-        pts[i].coord[0] = x;
-        pts[i].coord[1] = y;
+        pts[i][0] = x;
+        pts[i][1] = y;
     }
 
     fclose(f);
@@ -107,7 +98,7 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    double *ranges = (double *)malloc(q_count * 4 * sizeof(double));
+    double *ranges = new double[4 * q_count];
 
     for (int i = 0; i < q_count; ++i) {
         fscanf(f, "%lf, %lf, %lf, %lf", &ranges[i*4], &ranges[i*4+1], &ranges[i*4+2], &ranges[i*4+3]);
@@ -115,35 +106,35 @@ int main(int argc, char **argv)
 
     fclose(f);
 
-    struct Kdnode *kt = build_kdtree(pts, pt_count, 0, 2); 
+    KdTree<Point> kt(2, pts, pt_count);
 
     //run queries
     for (int i = 0; i < q_count; ++i) { 
 
-        struct KdtreeQueryResult kqr = kdtree_range_query(kt, &ranges[i*4], 2);  
-        struct KdtreeQueryResult lqr = linear_range_query(pt_count, pts, &ranges[i*4]);  
+        std::vector<Point *> kqr = kt.range_query(&ranges[i*4]);  
+        std::vector<Point *> lqr = linear_range_query(pt_count, pts, &ranges[i*4]);  
 
-        if (kqr.count != lqr.count) {
+        if (kqr.size() != lqr.size()) {
             printf("error: kdtree and linear do not agree for query %d\n", i + 1);
             printf("range: %.1f %.1f %.1f %.1f\n", ranges[i*4], ranges[i*4+1], ranges[i*4+2], ranges[i*4+3]);
-            printf("(kdtree) found %d points...\n", kqr.count);
-            for (size_t i = 0; i < kqr.count; ++i) {
-                printf("%d -> (%.1f, %.1f)\n", i + 1, kqr.pts[i].coord[0], kqr.pts[i].coord[1]);
+            printf("(kdtree) found %d points...\n", kqr.size());
+            for (size_t i = 0; i < kqr.size(); ++i) {
+                printf("%d -> (%.1f, %.1f)\n", i + 1, *(kqr[i])[0], *(kqr[i])[1]);
             }
-            printf("(linear) found %d points...\n", lqr.count);
-            for (size_t i = 0; i < lqr.count; ++i) {
-                printf("%d -> (%.1f, %.1f)\n", i + 1, lqr.pts[i].coord[0], lqr.pts[i].coord[1]);
+            printf("(linear) found %d points...\n", lqr.size());
+            for (size_t i = 0; i < lqr.size(); ++i) {
+                printf("%d -> (%.1f, %.1f)\n", i + 1, *(lqr[i])[0], *(lqr[i])[1]);
             }
+
+            delete[] pts;
+            delete[] ranges;
 
             return -1;
-        }
-
-        if (kqr.count) free(kqr.pts);
-        if (lqr.count) free(lqr.pts); 
+        } 
     }
 
-    free(pts);
-    free(ranges);
+    delete[] pts;
+    delete[] ranges;
 
     return 0;
 }

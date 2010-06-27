@@ -2,9 +2,9 @@
 INCS = -I../../include 
 LIBS = 
 CFLAGS = 
-LDFLAGS = 
-OBJS = range_query.o
-TARGET = ../../bin/range-query
+LDFLAGS = -L../../bin 
+OBJS = knn.o
+TARGET = ../../bin/knn
 
 all: $(OBJS)
 	g++ $(LDFLAGS) $(LIBS) $(OBJS) -o $(TARGET) 

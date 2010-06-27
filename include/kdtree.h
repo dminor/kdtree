@@ -23,33 +23,317 @@ THE SOFTWARE.
 #ifndef KD_TREE_H_
 #define KD_TREE_H_
 
-#include <stdlib.h>
+#include <cstdlib>
 
-struct Point {
-    double coord[2];
-    void *v;
+#include <algorithm>
+#include <vector>
+#include <limits>
+
+#include <iostream>
+
+template<class Point> class KdTree {
+
+public:
+
+    template<class T> struct Node {
+        Node *left, *right;
+        T pt;
+        size_t children;
+    };
+
+    KdTree(size_t dim, Point *pts, size_t n) : dim(dim)
+    {
+        root = build_kdtree(pts, n, 0);
+    }
+
+    virtual ~KdTree()
+    {
+
+    }
+
+    std::vector<Point *> range_query(double *range)
+    {
+        //set up region
+        double *region = new double[2 * dim]; 
+        for (int i = 0; i < dim; ++i) {
+            region[i] = -std::numeric_limits<double>::max();
+            region[i + 1] = std::numeric_limits<double>::min(); 
+        }
+
+        //run query
+        std::vector<Point *> qr = range_query(root, range, region, 0);
+
+        //clean up and return result;
+        delete[] region;
+
+        return qr;
+
+    }
+
+    std::vector<Point *> knn(size_t k, const Point &pt) 
+    {
+        std::vector<Point *> qr; 
+        std::vector<NodePriority> pq;
+        pq.push_back(NodePriority(root, 0.0));
+
+        size_t nfound = 0;
+        while (pq.size() && nfound < k) {
+
+            std::pop_heap(pq.begin(), pq.end());
+            NodePriority e = pq.back();
+            pq.pop_back(); 
+
+            if (e.node->left == 0 && e.node->right == 0) { 
+                qr.push_back(&e.node->pt);
+                ++nfound; 
+            } else {
+                double d = pt_node_distance(pt, e.node->left); 
+                pq.push_back(NodePriority(e.node->left, d)); 
+                std::push_heap(pq.begin(), pq.end());
+
+                d = pt_node_distance(pt, e.node->right);
+                pq.push_back(NodePriority(e.node->right, d));
+                std::push_heap(pq.begin(), pq.end());
+            } 
+        } 
+
+        return qr;
+    }
+
+    Node<Point> *root;
+
+private:
+
+    size_t dim;
+
+    Node<Point> *build_kdtree(Point *pts, size_t pt_count, size_t depth)
+    {
+        Node<Point> *result = new Node<Point>; 
+
+        if (pt_count == 1) {
+            //leaf node, store point and return
+            result->children = 1;
+            result->left = result->right = 0;
+            for(size_t i = 0; i < dim; ++i) result->pt[i] = pts[0][i];
+        } else {
+
+            //branch coordinate
+            size_t coord = depth % dim; 
+
+            //find median (has side effect of partitioning input array around median)
+            size_t median_index = (pt_count / 2) >> 1 << 1;
+            double median = select_order(median_index, pts, pt_count, coord);
+
+            //recursively build tree
+            result->left = build_kdtree(pts, median_index + 1, depth + 1); 
+            result->right = build_kdtree(&pts[median_index + 1], pt_count - median_index - 1, depth + 1);
+
+            //keep track of number of children
+            result->children = result->left->children + result->right->children;
+
+            //store median value
+            for (int i = 0; i < dim; ++i) result->pt[i] = 0;
+            result->pt[(coord + 1) % dim] = median;
+        } 
+
+        return result;
+    }
+
+    void swap(Point &a, Point &b)
+    {
+        double t;
+
+        for (size_t i = 0; i < dim; ++i) {
+            t = a[i];
+            a[i] = b[i];
+            b[i] = t; 
+        }
+    }
+
+    size_t partition(size_t start, size_t end, Point *pts, size_t coord)
+    { 
+        //choose pivot and place at end
+        size_t pivot = start + rand() % (end - start); 
+        swap(pts[pivot], pts[end]);
+
+        //get pivot value
+        double value = pts[end][coord];
+
+        //move values around pivot
+        size_t i = start;
+        for (size_t j = start; j < end; ++j) { 
+            if (pt_lt(coord, pts[j], pts[end])) {
+                swap(pts[i], pts[j]);
+                ++i;
+            }
+        }
+        
+        swap(pts[i], pts[end]);
+
+        return i; 
+    } 
+
+    double select_order(size_t i, Point *pts, size_t pt_count, size_t coord)
+    {
+        size_t start = 0;
+        size_t end = pt_count - 1; 
+
+        while (1) {
+
+            if (start == end) return pts[start][coord];
+     
+            size_t pivot = partition(start, end, pts, coord);
+
+            if (i == pivot) {
+                return pts[pivot][coord];
+            } else if (i < pivot) {
+                end = pivot - 1;
+            } else {
+                start = pivot + 1;
+            } 
+        } 
+    } 
+
+    int pt_lt(size_t coord, const Point &a, const Point &b) const
+    {
+        //if points are unequal, do direct comparison
+        if (a[coord] != b[coord]) {
+            return a[coord] < b[coord];
+        } else {
+            //otherwise, compare in lexicographic order
+            size_t i = (coord + 1) % dim; 
+            while (a[i] == b[i] && i != coord) i = (i + 1) % dim; 
+            return a[i] <= b[i];
+        }
+    } 
+
+    int point_in_range(Point *p, double *range)
+    {
+        for (int i = 0; i < dim; ++i) {
+            if (range[i*2] > (*p)[i] || range[i*2+1] < (*p)[i]) return 0;
+        }
+
+        return 1; 
+    }
+
+    int range_contains_region(double *range, double *region)
+    { 
+        for (int i = 0; i < dim; ++i) {
+            if (range[i*2] > region[i*2] || range[i*2+1] < region[i*2+1]) return 0;
+            if (range[i*2] > region[i*2+1] || range[i*2+1] < region[i*2]) return 0;
+        }
+
+        return 1; 
+    }
+
+    int region_intersects_range(double *range, double *region)
+    {
+        int intersects = 0;
+        for (int i = 0; i < dim; ++i) {
+            if (range[i*2] < region[i*2] || range[i*2+1] > region[i*2+1]) intersects = 1; 
+            if (range[i*2] < region[i*2+1] || range[i*2+1] > region[i*2]) intersects = 1; 
+        }
+
+        return intersects; 
+    }
+
+    void report_subtree(Node<Point> *tree, std::vector<Point *> &qr)
+    { 
+        if (tree->left == 0 && tree->right == 0) {
+            qr.push_back(&tree->pt);
+        } else {
+            //recurse through tree
+            report_subtree(tree->left, qr);
+            report_subtree(tree->right, qr);
+        }
+    }
+
+    std::vector<Point *> range_query(Node<Point> *tree, double *range, double *region, size_t depth)
+    {
+        std::vector<Point *> qr;
+
+        //leaf node
+        if (tree->left == 0 && tree->right == 0) { 
+            if (point_in_range(&tree->pt, range)) {
+                qr.push_back(&tree->pt);
+            }
+        } else {
+
+            std::vector<Point *> lqr, rqr;
+
+            double split_value = tree->pt[(depth + 1) % dim];
+
+            //left subtree -- update region
+            int changed_index = 2 * (depth % dim) + 1;
+
+            double changed_value = region[changed_index];    
+            region[changed_index] = split_value; 
+
+            if (range_contains_region(range, region)) {
+                if (tree->left->children) {
+                    report_subtree(tree->left, lqr);
+                }
+            } else if (region_intersects_range(region, range)) {
+                lqr = range_query(tree->left, range, region, depth+1); 
+            }
+
+            //restore region 
+            region[changed_index] = changed_value; 
+
+            //right subtree -- update region 
+            changed_index = 2 * (depth % dim);
+            changed_value = region[changed_index];    
+            region[changed_index] = split_value; 
+
+            if (range_contains_region(range, region)) {
+                if (tree->right->children) {
+                    report_subtree(tree->right, rqr);
+                }
+            } else if (region_intersects_range(region, range)) {
+                rqr = range_query(tree->right, range, region, depth+1); 
+            }
+
+            //restore region 
+            region[changed_index] = changed_value; 
+
+            //collect results
+            qr.insert(qr.end(), lqr.begin(), lqr.end());
+            qr.insert(qr.end(), rqr.begin(), rqr.end()); 
+        }
+
+        return qr; 
+    }
+
+    double pt_node_distance(const Point &p1, Node<Point> *node)
+    {
+        Point &p2 = node->pt;
+
+        double d = 0.0;
+        if (node->left == 0 && node->right == 0) {
+            for (int i = 0; i < dim; ++i) {
+                d += (p1[i]-p2[i]) * (p1[i]-p2[i]); 
+            } 
+        } else { 
+            for (int i = 0; i < dim; ++i) { 
+                d -= (p1[i]-p2[(i - 1) % dim]) * (p1[i]-p2[(i - 1) % dim]); 
+            }
+        }
+
+        return d; 
+    } 
+
+    struct NodePriority {
+        Node<Point> *node;
+        double priority;
+
+        NodePriority(Node<Point> *node, double priority) : node(node), priority(priority) {};
+
+        bool operator<(const NodePriority &other) const
+        {
+            return priority > other.priority;
+        }
+    };
 };
-
-struct Kdnode {
-    struct Kdnode *left, *right;
-    struct Point pt;
-    size_t children;
-};
-
-struct KdtreeRangeQueryResult {
-    size_t count;
-    struct Point *pts;
-};
-
-struct KdtreeKNNResult {
-    size_t count;
-    struct Point *pts;
-    double *distances;
-};
-
-struct Kdnode *build_kdtree(struct Point *pts, size_t pt_count, size_t depth, size_t dim);
-struct KdtreeRangeQueryResult kdtree_range_query(struct Kdnode *tree, double *range, size_t dim); 
-struct KdtreeKNNResult kdtree_knn(struct Kdnode *tree, size_t k, double *pt, size_t dim);
 
 #endif
 
