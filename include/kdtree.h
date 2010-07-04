@@ -23,17 +23,30 @@ THE SOFTWARE.
 #ifndef KD_TREE_H_
 #define KD_TREE_H_
 
+#include <cmath>
 #include <cstdlib>
 
 #include <algorithm>
 #include <vector>
 #include <limits>
 
-#include <iostream>
-
 template<class Point> class KdTree {
 
 public:
+
+    template<class T> struct PointPriority {
+
+        T *pt;
+        double priority;
+
+        PointPriority(T *pt, double priority) : pt(pt), priority(priority) {};
+
+        //min-heap
+        bool operator<(const PointPriority &other) const
+        {
+            return priority > other.priority;
+        }
+    }; 
 
     template<class T> struct Node {
         Node *left, *right;
@@ -48,7 +61,16 @@ public:
 
     virtual ~KdTree()
     {
+        std::vector<Node<Point> *> nodes;
+        nodes.push_back(root);
+        while (!nodes.empty()) {
+            Node<Point> *n = nodes.back();
+            nodes.pop_back();
 
+            if (n->left) nodes.push_back(n->left);
+            if (n->right) nodes.push_back(n->right);
+            delete n;
+        }
     }
 
     std::vector<Point *> range_query(double *range)
@@ -70,34 +92,13 @@ public:
 
     }
 
-    std::vector<Point *> knn(size_t k, const Point &pt) 
+    std::vector<PointPriority<Point> > knn(size_t k, const Point &pt) 
     {
-        std::vector<Point *> qr; 
-        std::vector<NodePriority> pq;
-        pq.push_back(NodePriority(root, 0.0));
-
-        size_t nfound = 0;
-        while (pq.size() && nfound < k) {
-
-            std::pop_heap(pq.begin(), pq.end());
-            NodePriority e = pq.back();
-            pq.pop_back(); 
-
-            if (e.node->left == 0 && e.node->right == 0) { 
-                qr.push_back(&e.node->pt);
-                ++nfound; 
-            } else {
-                double d = pt_node_distance(pt, e.node->left); 
-                pq.push_back(NodePriority(e.node->left, d)); 
-                std::push_heap(pq.begin(), pq.end());
-
-                d = pt_node_distance(pt, e.node->right);
-                pq.push_back(NodePriority(e.node->right, d));
-                std::push_heap(pq.begin(), pq.end());
-            } 
-        } 
-
-        return qr;
+        std::vector<PointPriority<Point> > pq; 
+        knn_search(pq, root, k, pt, 0);
+        std::sort_heap(pq.begin(), pq.end());
+        std::reverse(pq.begin(), pq.end());
+        return pq;
     }
 
     Node<Point> *root;
@@ -304,6 +305,42 @@ private:
         return qr; 
     }
 
+    void knn_search(std::vector<PointPriority<Point> > &pq, Node<Point> *node, size_t k, const Point &pt, size_t depth)
+    { 
+        if (node->left == 0 && node->right == 0) {
+            double d = 0.0; 
+            for (int i = 0; i < dim; ++i) {
+                d += (node->pt[i]-pt[i]) * (node->pt[i]-pt[i]); 
+            } 
+            pq.push_back(PointPriority<Point>(&node->pt, sqrt(d)));
+            std::push_heap(pq.begin(), pq.end()); 
+        } else { 
+            if (pt[depth % dim] < node->pt[(depth + 1) % dim]) { 
+                knn_search(pq, node->left, k, pt, depth + 1);
+
+                double d = 0.0;
+                for (int i = 0; i < pq.size() && i < k; ++i) {
+                    if (pq[i].priority > d) d = pq[i].priority; 
+                }
+
+                if (abs(node->pt[(depth + 1) % dim] - pt[depth % dim]) < d || pq.size() < k) { 
+                    knn_search(pq, node->right, k, pt, depth + 1);
+                }
+            } else {
+                knn_search(pq, node->right, k, pt, depth + 1);
+
+                double d = 0.0;
+                for (int i = 0; i < pq.size() && i < k; ++i) {
+                    if (pq[i].priority > d) d = pq[i].priority; 
+                }
+
+                if (abs(node->pt[(depth + 1) % dim] - pt[depth % dim]) < d || pq.size() < k) {
+                    knn_search(pq, node->left, k, pt, depth + 1);
+                }
+            }
+        }
+    }
+
     double pt_node_distance(const Point &p1, Node<Point> *node)
     {
         Point &p2 = node->pt;
@@ -315,24 +352,16 @@ private:
             } 
         } else { 
             for (int i = 0; i < dim; ++i) { 
-                d -= (p1[i]-p2[(i - 1) % dim]) * (p1[i]-p2[(i - 1) % dim]); 
+                if (p2[i] > 0.0) { 
+                    d = (p2[i]-p1[(i - 1) % dim]) * (p2[i]-p1[(i - 1) % dim]); 
+                    break;
+                } 
             }
         }
 
-        return d; 
+        return sqrt(d); 
     } 
 
-    struct NodePriority {
-        Node<Point> *node;
-        double priority;
-
-        NodePriority(Node<Point> *node, double priority) : node(node), priority(priority) {};
-
-        bool operator<(const NodePriority &other) const
-        {
-            return priority > other.priority;
-        }
-    };
 };
 
 #endif

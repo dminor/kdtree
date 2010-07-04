@@ -23,6 +23,9 @@ THE SOFTWARE.
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <fstream>
+#include <iostream>
+
 #include "kdtree.h"
 
 struct Point {
@@ -68,88 +71,95 @@ std::vector<Point *> sort_knn(Point *pts, size_t pt_count, size_t k, Point pt)
 int main(int argc, char **argv)
 { 
     if (argc != 3) {
-        printf("usage: knn <pts> <queries>\n");
+        std::cout << "usage: knn <pts> <queries>" << std::endl;
         exit(1);
     }
 
     //read points
     int pt_count;
 
-    FILE *f = fopen(argv[1], "r");
+    std::ifstream ptf(argv[1]);
 
-    if (!f) {
-        printf("error: could not open points file: %s\n", argv[1]);
+    if (!ptf) {
+        std::cout << "error: could not open points file: " << argv[1] << std::endl;
         exit(1); 
     }
 
-    fscanf(f, "%d", &pt_count);
+    ptf >> pt_count;
 
     if (pt_count < 0) {
-        printf("error: invalid point count %d\n", pt_count);
+        std::cout << "error: invalid point count " << pt_count << std::endl;
         exit(1);
     }
 
     Point *pts = new Point[pt_count]; 
-    for (int i = 0; i < pt_count; ++i) {
-        fscanf(f, "%lf, %lf", &(pts[i][0]), &(pts[i][1]));
+    for (int i = 0; i < pt_count; ++i) { 
+        ptf >> (pts[i][0]);
+        ptf >> (pts[i][1]);
     }
 
-    fclose(f);
+    ptf.close();
 
     //read queries
     int q_count;
 
-    f = fopen(argv[2], "r");
+    std::ifstream qf(argv[2]);
 
-    if (!f) {
-        printf("error: could not open query file: %s\n", argv[2]);
+    if (!qf) {
+        std::cout << "error: could not open query file: " << argv[2] << std::endl;
         exit(1); 
     }
 
-    fscanf(f, "%d", &q_count);
+    qf >> q_count;
 
     if (q_count < 0) {
-        printf("error: invalid query count %d\n", q_count);
+        std::cout << "error: invalid query count " << q_count << std::endl;
         exit(1);
     }
 
     Point *queries = new Point[q_count]; 
 
     for (int i = 0; i < q_count; ++i) {
-        fscanf(f, "%lf, %lf", &(queries[i][0]), &(queries[i][1]));
+        qf >> queries[i][0];
+        qf >> queries[i][1];
     }
 
-    fclose(f);
+    qf.close();
 
     KdTree<Point> kt(2, pts, pt_count);
 
     //run queries
     for (int i = 0; i < q_count; ++i) { 
 
-        std::vector<Point *> kqr = kt.knn(5, queries[i]);  
+        std::vector<KdTree<Point>::PointPriority<Point> > kqr = kt.knn(5, queries[i]);  
         std::vector<Point *> lqr = sort_knn(pts, pt_count, 5, queries[i]);  
 
+        if (kqr.size() < 5) {
+            std::cout << "error: did not find 5 neighbouring points in kdtree" << std::endl;
+            continue;
+        }
+
         for (int j = 0; j < 5; ++j) {
-            double x = (*lqr[j])[0] - (*kqr[j])[0]; 
-            double y = (*lqr[j])[1] - (*kqr[j])[1];
+            double x = (*lqr[j])[0] - (*kqr[j].pt)[0]; 
+            double y = (*lqr[j])[1] - (*kqr[j].pt)[1];
 
             if ((x*x + y*y) > 0.0001) {
                 printf("error: kdtree nearest neighbour does not match sort nearest neighbour\n");
 
                 printf("query: %d %.3f %.3f\n", i, queries[i][0], queries[i][1]);
-                double d1 = (queries[i][0]-(*kqr[j])[0])*(queries[i][0]-(*kqr[j])[0]) + (queries[i][1]-(*kqr[j])[1])*(queries[i][1]-(*kqr[j])[1]);
+                double d1 = (queries[i][0]-(*kqr[j].pt)[0])*(queries[i][0]-(*kqr[j].pt)[0]) + (queries[i][1]-(*kqr[j].pt)[1])*(queries[i][1]-(*kqr[j].pt)[1]);
                 double d2 = (queries[i][0]-(*lqr[j])[0])*(queries[i][0]-(*lqr[j])[0]) + (queries[i][1]-(*lqr[j])[1])*(queries[i][1]-(*lqr[j])[1]);
-                printf("%d kqr: %.3f %.3f %.3f ", j, (*kqr[j])[0], (*kqr[j])[1], d1);
+                printf("%d kqr: %.3f %.3f %.3f ", j, (*kqr[j].pt)[0], (*kqr[j].pt)[1], d1);
                 printf("lqr: %.3f %.3f %.3f\n", (*lqr[j])[0], (*lqr[j])[1], d2);
 
-                return 1;
+                //return 1;
             }
 
         } 
     }
 
     delete[] pts;
-    delete[] queries;
+    delete[] queries; 
 
     return 0;
 }
