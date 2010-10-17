@@ -94,7 +94,9 @@ int main(int argc, char **argv)
 
     Point *pts = new Point[pt_count]; 
     for (int i = 0; i < pt_count; ++i) { 
+        char c;
         ptf >> (pts[i][0]);
+        ptf >> c;
         ptf >> (pts[i][1]);
     }
 
@@ -120,7 +122,10 @@ int main(int argc, char **argv)
     Point *queries = new Point[q_count]; 
 
     for (int i = 0; i < q_count; ++i) {
+        char c;
+
         qf >> queries[i][0];
+        qf >> c;
         qf >> queries[i][1];
     }
 
@@ -144,15 +149,15 @@ int main(int argc, char **argv)
             double y = (*lqr[j])[1] - (*kqr[j].pt)[1];
 
             if ((x*x + y*y) > 0.0001) {
-                printf("error: kdtree nearest neighbour does not match sort nearest neighbour\n");
+                std::cout << "error: kdtree nearest neighbour does not match sort nearest neighbour" << std::endl;
 
-                printf("query: %d %.3f %.3f\n", i, queries[i][0], queries[i][1]);
+                std::cout << "query " << i << ": " << queries[i][0] << " " << queries[i][1];
                 double d1 = (queries[i][0]-(*kqr[j].pt)[0])*(queries[i][0]-(*kqr[j].pt)[0]) + (queries[i][1]-(*kqr[j].pt)[1])*(queries[i][1]-(*kqr[j].pt)[1]);
                 double d2 = (queries[i][0]-(*lqr[j])[0])*(queries[i][0]-(*lqr[j])[0]) + (queries[i][1]-(*lqr[j])[1])*(queries[i][1]-(*lqr[j])[1]);
-                printf("%d kqr: %.3f %.3f %.3f ", j, (*kqr[j].pt)[0], (*kqr[j].pt)[1], d1);
-                printf("lqr: %.3f %.3f %.3f\n", (*lqr[j])[0], (*lqr[j])[1], d2);
+                std::cout << j << " kqr: " <<  (*kqr[j].pt)[0] << " " << (*kqr[j].pt)[1] << " " << d1;
+                std::cout << "lqr: " << (*lqr[j])[0] << " " << (*lqr[j])[1] << " " << d2;
 
-                //return 1;
+                return 1;
             }
 
         } 
