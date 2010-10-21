@@ -1,7 +1,7 @@
 
 INCS = -I../../include 
 LIBS = 
-CFLAGS = 
+CFLAGS = -g
 LDFLAGS = -L../../bin 
 OBJS = knn.o
 TARGET = ../../bin/knn

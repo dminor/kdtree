@@ -1,1 +1,1 @@
-A rudimentary Kd-tree implementation.
+A simple Kd-tree implementation supporting range and exact nearest neighbour queries.

@@ -20,9 +20,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 
@@ -136,30 +137,30 @@ int main(int argc, char **argv)
     //run queries
     for (int i = 0; i < q_count; ++i) { 
 
-        std::vector<KdTree<Point>::PointPriority<Point> > kqr = kt.knn(5, queries[i]);  
+        std::vector<std::pair<Point *, double> > kqr = kt.knn(5, queries[i]);  
         std::vector<Point *> lqr = sort_knn(pts, pt_count, 5, queries[i]);  
 
-        if (kqr.size() < 5) {
-            std::cout << "error: did not find 5 neighbouring points in kdtree" << std::endl;
-            continue;
-        }
-
         for (int j = 0; j < 5; ++j) {
-            double x = (*lqr[j])[0] - (*kqr[j].pt)[0]; 
-            double y = (*lqr[j])[1] - (*kqr[j].pt)[1];
+
+            if (kqr[j].first == 0) {
+                std::cout << "error: did not find 5 neighbouring points in kdtree" << std::endl;
+                return 1; 
+            }
+
+            double x = (*lqr[j])[0] - (*kqr[j].first)[0]; 
+            double y = (*lqr[j])[1] - (*kqr[j].first)[1];
 
             if ((x*x + y*y) > 0.0001) {
                 std::cout << "error: kdtree nearest neighbour does not match sort nearest neighbour" << std::endl;
 
-                std::cout << "query " << i << ": " << queries[i][0] << " " << queries[i][1];
-                double d1 = (queries[i][0]-(*kqr[j].pt)[0])*(queries[i][0]-(*kqr[j].pt)[0]) + (queries[i][1]-(*kqr[j].pt)[1])*(queries[i][1]-(*kqr[j].pt)[1]);
+                std::cout << "query " << i << ": " << queries[i][0] << " " << queries[i][1] << std::endl;
+                std::cout << "result" << j << std::endl; 
                 double d2 = (queries[i][0]-(*lqr[j])[0])*(queries[i][0]-(*lqr[j])[0]) + (queries[i][1]-(*lqr[j])[1])*(queries[i][1]-(*lqr[j])[1]);
-                std::cout << j << " kqr: " <<  (*kqr[j].pt)[0] << " " << (*kqr[j].pt)[1] << " " << d1;
-                std::cout << "lqr: " << (*lqr[j])[0] << " " << (*lqr[j])[1] << " " << d2;
+                std::cout << j << " kqr: " <<  (*kqr[j].first)[0] << " " << (*kqr[j].first)[1] << " " << kqr[j].second << std::endl;
+                std::cout << "lqr: " << (*lqr[j])[0] << " " << (*lqr[j])[1] << " " << sqrt(d2) << std::endl;
 
                 return 1;
-            }
-
+            } 
         } 
     }
 

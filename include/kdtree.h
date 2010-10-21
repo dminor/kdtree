@@ -26,27 +26,12 @@ THE SOFTWARE.
 #include <cmath>
 #include <cstdlib>
 
-#include <algorithm>
-#include <vector>
 #include <limits>
+#include <vector>
 
 template<class Point> class KdTree {
 
 public:
-
-    template<class T> struct PointPriority {
-
-        T *pt;
-        double priority;
-
-        PointPriority(T *pt, double priority) : pt(pt), priority(priority) {};
-
-        //min-heap
-        bool operator<(const PointPriority &other) const
-        {
-            return priority > other.priority;
-        }
-    }; 
 
     template<class T> struct Node {
         Node *left, *right;
@@ -92,13 +77,17 @@ public:
 
     }
 
-    std::vector<PointPriority<Point> > knn(size_t k, const Point &pt) 
+    std::vector<std::pair<Point *, double> > knn(size_t k, const Point &pt) 
     {
-        std::vector<PointPriority<Point> > pq; 
-        knn_search(pq, root, k, pt, 0);
-        std::sort_heap(pq.begin(), pq.end());
-        std::reverse(pq.begin(), pq.end());
-        return pq;
+        std::vector<std::pair<Point *, double> > qr; 
+        qr.reserve(k);
+        for (size_t i = 0; i < k; ++i) {
+            qr[i].first = 0;
+            qr[i].second = std::numeric_limits<double>::max();
+        }
+ 
+        knn_search(qr, root, k, pt, 0);
+        return qr;
     }
 
     Node<Point> *root;
@@ -305,62 +294,49 @@ private:
         return qr; 
     }
 
-    void knn_search(std::vector<PointPriority<Point> > &pq, Node<Point> *node, size_t k, const Point &pt, size_t depth)
+    void knn_search(std::vector<std::pair<Point *, double> > &qr, Node<Point> *node, size_t k, const Point &pt, size_t depth)
     { 
         if (node->left == 0 && node->right == 0) {
+
+            //calculate distance from query point to this point
             double d = 0.0; 
             for (int i = 0; i < dim; ++i) {
                 d += (node->pt[i]-pt[i]) * (node->pt[i]-pt[i]); 
+            }
+            d = sqrt(d);
+
+            //insert point in proper order, for small k this will be fast enough
+            for (size_t i = 0; i < k; ++i) {
+                if (qr[i].second > d) {
+                    for (size_t j = k - 1; j > i; --j) {
+                        qr[j] = qr[j - 1];
+                    }
+                    qr[i].first = &node->pt;
+                    qr[i].second = d;
+                    break; 
+                }
             } 
-            pq.push_back(PointPriority<Point>(&node->pt, sqrt(d)));
-            std::push_heap(pq.begin(), pq.end()); 
         } else { 
             if (pt[depth % dim] < node->pt[(depth + 1) % dim]) { 
-                knn_search(pq, node->left, k, pt, depth + 1);
+                knn_search(qr, node->left, k, pt, depth + 1);
 
-                double d = 0.0;
-                for (int i = 0; i < pq.size() && i < k; ++i) {
-                    if (pq[i].priority > d) d = pq[i].priority; 
+                //if other side closer than farthest point, search it as well
+                double d = qr[k - 1].second; 
+                if (abs(node->pt[(depth + 1) % dim] - pt[depth % dim]) < d) { 
+                    knn_search(qr, node->right, k, pt, depth + 1);
                 }
 
-                if (abs(node->pt[(depth + 1) % dim] - pt[depth % dim]) < d || pq.size() < k) { 
-                    knn_search(pq, node->right, k, pt, depth + 1);
-                }
             } else {
-                knn_search(pq, node->right, k, pt, depth + 1);
+                knn_search(qr, node->right, k, pt, depth + 1);
 
-                double d = 0.0;
-                for (int i = 0; i < pq.size() && i < k; ++i) {
-                    if (pq[i].priority > d) d = pq[i].priority; 
-                }
-
-                if (abs(node->pt[(depth + 1) % dim] - pt[depth % dim]) < d || pq.size() < k) {
-                    knn_search(pq, node->left, k, pt, depth + 1);
+                //if other side closer than farthest point, search it as well
+                double d = qr[k - 1].second; 
+                if (abs(node->pt[(depth + 1) % dim] - pt[depth % dim]) < d) {
+                    knn_search(qr, node->left, k, pt, depth + 1);
                 }
             }
         }
     }
-
-    double pt_node_distance(const Point &p1, Node<Point> *node)
-    {
-        Point &p2 = node->pt;
-
-        double d = 0.0;
-        if (node->left == 0 && node->right == 0) {
-            for (int i = 0; i < dim; ++i) {
-                d += (p1[i]-p2[i]) * (p1[i]-p2[i]); 
-            } 
-        } else { 
-            for (int i = 0; i < dim; ++i) { 
-                if (p2[i] > 0.0) { 
-                    d = (p2[i]-p1[(i - 1) % dim]) * (p2[i]-p1[(i - 1) % dim]); 
-                    break;
-                } 
-            }
-        }
-
-        return sqrt(d); 
-    } 
 
 };
 
