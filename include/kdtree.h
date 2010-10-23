@@ -77,7 +77,7 @@ public:
 
     }
 
-    std::vector<std::pair<Point *, double> > knn(size_t k, const Point &pt) 
+    std::vector<std::pair<Point *, double> > knn(size_t k, const Point &pt, double eps) 
     {
         std::vector<std::pair<Point *, double> > qr; 
         qr.reserve(k);
@@ -86,7 +86,7 @@ public:
             qr[i].second = std::numeric_limits<double>::max();
         }
  
-        knn_search(qr, root, k, pt, 0);
+        knn_search(qr, root, k, pt, eps, 0);
         return qr;
     }
 
@@ -294,7 +294,7 @@ private:
         return qr; 
     }
 
-    void knn_search(std::vector<std::pair<Point *, double> > &qr, Node<Point> *node, size_t k, const Point &pt, size_t depth)
+    void knn_search(std::vector<std::pair<Point *, double> > &qr, Node<Point> *node, size_t k, const Point &pt, double eps, size_t depth)
     { 
         if (node->left == 0 && node->right == 0) {
 
@@ -318,21 +318,21 @@ private:
             } 
         } else { 
             if (pt[depth % dim] < node->pt[(depth + 1) % dim]) { 
-                knn_search(qr, node->left, k, pt, depth + 1);
+                knn_search(qr, node->left, k, pt, eps, depth + 1);
 
                 //if other side closer than farthest point, search it as well
-                double d = qr[k - 1].second; 
+                double d = (1 + eps)*qr[k - 1].second; 
                 if (abs(node->pt[(depth + 1) % dim] - pt[depth % dim]) < d) { 
-                    knn_search(qr, node->right, k, pt, depth + 1);
+                    knn_search(qr, node->right, k, pt, eps, depth + 1);
                 }
 
             } else {
-                knn_search(qr, node->right, k, pt, depth + 1);
+                knn_search(qr, node->right, k, pt, eps, depth + 1);
 
                 //if other side closer than farthest point, search it as well
-                double d = qr[k - 1].second; 
+                double d = (1 + eps)*qr[k - 1].second; 
                 if (abs(node->pt[(depth + 1) % dim] - pt[depth % dim]) < d) {
-                    knn_search(qr, node->left, k, pt, depth + 1);
+                    knn_search(qr, node->left, k, pt, eps, depth + 1);
                 }
             }
         }
