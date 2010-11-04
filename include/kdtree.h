@@ -82,8 +82,7 @@ public:
         std::vector<std::pair<Point *, double> > qr; 
         qr.reserve(k);
         for (size_t i = 0; i < k; ++i) {
-            qr[i].first = 0;
-            qr[i].second = std::numeric_limits<double>::max();
+            qr.push_back(std::make_pair<Point *, double>(0, std::numeric_limits<double>::max()));
         }
  
         knn_search(qr, root, k, pt, eps, 0);
@@ -313,6 +312,8 @@ private:
                     }
                     qr[i].first = &node->pt;
                     qr[i].second = d;
+
+                    std::cout << "inserted at: " << i << " d=" << d << std::endl;
                     break; 
                 }
             } 
