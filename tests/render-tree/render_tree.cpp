@@ -32,7 +32,7 @@ void render_tree(FILE *f, struct KdTree<Point>::Node<Point> *tree, size_t depth,
 {
     if (tree->left == 0 && tree->right == 0) {
         //leaf
-        fprintf(f, "%.0f %.0f draw-point\n", tree->pt[0], tree->pt[1]);
+        fprintf(f, "%.0f %.0f draw-point\n", (*tree->pt)[0], (*tree->pt)[1]);
     } else {
         //branch 
         if (depth < 1) fprintf(f, "4 setlinewidth\n");
@@ -41,13 +41,13 @@ void render_tree(FILE *f, struct KdTree<Point>::Node<Point> *tree, size_t depth,
         else fprintf(f, "1 setlinewidth\n");
 
         if (depth % 2 == 1) {
-            fprintf(f, "%.0f %.0f %.0f h-line\n", x1, x2, tree->pt[0]);
-            render_tree(f, tree->left, depth + 1, x1, x2, y1, tree->pt[0]);
-            render_tree(f, tree->right, depth + 1, x1, x2, tree->pt[0], y2);
+            fprintf(f, "%.0f %.0f %.0f h-line\n", x1, x2, tree->median);
+            render_tree(f, tree->left, depth + 1, x1, x2, y1, tree->median);
+            render_tree(f, tree->right, depth + 1, x1, x2, tree->median, y2);
         } else {
-            fprintf(f, "%.0f %.0f %.0f v-line\n", tree->pt[1], y1, y2);
-            render_tree(f, tree->left, depth + 1, x1, tree->pt[1], y1, y2);
-            render_tree(f, tree->right, depth + 1, tree->pt[1], x2, y1, y2);
+            fprintf(f, "%.0f %.0f %.0f v-line\n", tree->median, y1, y2);
+            render_tree(f, tree->left, depth + 1, x1, tree->median, y1, y2);
+            render_tree(f, tree->right, depth + 1, tree->median, x2, y1, y2);
         }
 
     }

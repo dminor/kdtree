@@ -12,5 +12,7 @@ all: $(OBJS)
 .cpp.o:
 	g++ $(INCS) $(CFLAGS) -c $< -o $@
 
+knn.o: ../../include/kdtree.h
+
 clean:
 	rm *.o $(TARGET) 

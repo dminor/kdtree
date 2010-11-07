@@ -35,7 +35,8 @@ public:
 
     template<class T> struct Node {
         Node *left, *right;
-        T pt;
+        T *pt;
+        double median;
         size_t children;
     };
 
@@ -103,7 +104,8 @@ private:
             //leaf node, store point and return
             result->children = 1;
             result->left = result->right = 0;
-            for(size_t i = 0; i < dim; ++i) result->pt[i] = pts[0][i];
+            result->pt = pts;
+            result->median = 0.0;
         } else {
 
             //branch coordinate
@@ -121,8 +123,8 @@ private:
             result->children = result->left->children + result->right->children;
 
             //store median value
-            for (int i = 0; i < dim; ++i) result->pt[i] = 0;
-            result->pt[(coord + 1) % dim] = median;
+            result->pt = 0;
+            result->median = median;
         } 
 
         return result;
@@ -228,8 +230,8 @@ private:
 
     void report_subtree(Node<Point> *tree, std::vector<Point *> &qr)
     { 
-        if (tree->left == 0 && tree->right == 0) {
-            qr.push_back(&tree->pt);
+        if (tree->pt) {
+            qr.push_back(tree->pt);
         } else {
             //recurse through tree
             report_subtree(tree->left, qr);
@@ -242,15 +244,15 @@ private:
         std::vector<Point *> qr;
 
         //leaf node
-        if (tree->left == 0 && tree->right == 0) { 
-            if (point_in_range(&tree->pt, range)) {
-                qr.push_back(&tree->pt);
+        if (tree->pt) {
+            if (point_in_range(tree->pt, range)) {
+                qr.push_back(tree->pt);
             }
         } else {
 
             std::vector<Point *> lqr, rqr;
 
-            double split_value = tree->pt[(depth + 1) % dim];
+            double split_value = tree->median;//[(depth + 1) % dim];
 
             //left subtree -- update region
             int changed_index = 2 * (depth % dim) + 1;
@@ -295,12 +297,12 @@ private:
 
     void knn_search(std::vector<std::pair<Point *, double> > &qr, Node<Point> *node, size_t k, const Point &pt, double eps, size_t depth)
     { 
-        if (node->left == 0 && node->right == 0) {
+        if (node->pt) {
 
             //calculate distance from query point to this point
             double d = 0.0; 
             for (int i = 0; i < dim; ++i) {
-                d += (node->pt[i]-pt[i]) * (node->pt[i]-pt[i]); 
+                d += ((*(node->pt))[i]-pt[i]) * ((*(node->pt))[i]-pt[i]); 
             }
             d = sqrt(d);
 
@@ -310,20 +312,18 @@ private:
                     for (size_t j = k - 1; j > i; --j) {
                         qr[j] = qr[j - 1];
                     }
-                    qr[i].first = &node->pt;
-                    qr[i].second = d;
-
-                    std::cout << "inserted at: " << i << " d=" << d << std::endl;
+                    qr[i].first = node->pt;
+                    qr[i].second = d; 
                     break; 
                 }
             } 
         } else { 
-            if (pt[depth % dim] < node->pt[(depth + 1) % dim]) { 
+            if (pt[depth % dim] < node->median) { 
                 knn_search(qr, node->left, k, pt, eps, depth + 1);
 
                 //if other side closer than farthest point, search it as well
                 double d = (1 + eps)*qr[k - 1].second; 
-                if (abs(node->pt[(depth + 1) % dim] - pt[depth % dim]) < d) { 
+                if (abs(node->median - pt[depth % dim]) < d) { 
                     knn_search(qr, node->right, k, pt, eps, depth + 1);
                 }
 
@@ -332,7 +332,7 @@ private:
 
                 //if other side closer than farthest point, search it as well
                 double d = (1 + eps)*qr[k - 1].second; 
-                if (abs(node->pt[(depth + 1) % dim] - pt[depth % dim]) < d) {
+                if (abs(node->median - pt[depth % dim]) < d) {
                     knn_search(qr, node->left, k, pt, eps, depth + 1);
                 }
             }

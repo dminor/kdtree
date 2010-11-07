@@ -102,6 +102,12 @@ int main(int argc, char **argv)
     }
 
     ptf.close();
+    
+    //make a copy of points file for sort knn
+    Point *pts2 = new Point[pt_count];
+    for (int i = 0; i < pt_count; ++i) {
+        pts2[i] = pts[i];
+    }
 
     //read queries
     int q_count;
@@ -138,7 +144,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < q_count; ++i) { 
 
         std::vector<std::pair<Point *, double> > kqr = kt.knn(5, queries[i], 0.0);  
-        std::vector<Point *> lqr = sort_knn(pts, pt_count, 5, queries[i]);  
+        std::vector<Point *> lqr = sort_knn(pts2, pt_count, 5, queries[i]);  
 
         for (int j = 0; j < 5; ++j) {
 
@@ -147,8 +153,8 @@ int main(int argc, char **argv)
                 return 1; 
             }
 
-            double x = (*lqr[j])[0] - (*kqr[j].first)[0]; 
-            double y = (*lqr[j])[1] - (*kqr[j].first)[1];
+            double x = (*lqr[j])[0] - kqr[j].first->operator[](0); 
+            double y = (*lqr[j])[1] - kqr[j].first->operator[](1);
 
             if ((x*x + y*y) > 0.0001) {
                 std::cout << "error: kdtree nearest neighbour does not match sort nearest neighbour" << std::endl;
