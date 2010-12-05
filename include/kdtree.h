@@ -304,7 +304,6 @@ private:
             for (int i = 0; i < dim; ++i) {
                 d += ((*(node->pt))[i]-pt[i]) * ((*(node->pt))[i]-pt[i]); 
             }
-            d = sqrt(d);
 
             //insert point in proper order, for small k this will be fast enough
             for (size_t i = 0; i < k; ++i) {
@@ -322,8 +321,7 @@ private:
                 knn_search(qr, node->left, k, pt, eps, depth + 1);
 
                 //if other side closer than farthest point, search it as well
-                double d = (1 + eps)*qr[k - 1].second; 
-                if (abs(node->median - pt[depth % dim]) < d) { 
+                if ((1.0 + eps)*abs(node->median - pt[depth % dim]) < qr[k - 1].second) { 
                     knn_search(qr, node->right, k, pt, eps, depth + 1);
                 }
 
@@ -331,8 +329,7 @@ private:
                 knn_search(qr, node->right, k, pt, eps, depth + 1);
 
                 //if other side closer than farthest point, search it as well
-                double d = (1 + eps)*qr[k - 1].second; 
-                if (abs(node->median - pt[depth % dim]) < d) {
+                if ((1.0 + eps)*abs(node->median - pt[depth % dim]) < qr[k - 1].second) {
                     knn_search(qr, node->left, k, pt, eps, depth + 1);
                 }
             }
