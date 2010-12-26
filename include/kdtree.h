@@ -33,9 +33,9 @@ template<class Point> class KdTree {
 
 public:
 
-    template<class T> struct Node {
+    struct Node {
         Node *left, *right;
-        T *pt;
+        Point *pt;
         double median;
         size_t children;
     };
@@ -47,10 +47,10 @@ public:
 
     virtual ~KdTree()
     {
-        std::vector<Node<Point> *> nodes;
+        std::vector<Node *> nodes;
         nodes.push_back(root);
         while (!nodes.empty()) {
-            Node<Point> *n = nodes.back();
+            Node *n = nodes.back();
             nodes.pop_back();
 
             if (n->left) nodes.push_back(n->left);
@@ -90,15 +90,15 @@ public:
         return qr;
     }
 
-    Node<Point> *root;
+    Node *root;
 
 private:
 
     size_t dim;
 
-    Node<Point> *build_kdtree(Point *pts, size_t pt_count, size_t depth)
+    Node *build_kdtree(Point *pts, size_t pt_count, size_t depth)
     {
-        Node<Point> *result = new Node<Point>; 
+        Node *result = new Node; 
 
         if (pt_count == 1) {
             //leaf node, store point and return
@@ -228,7 +228,7 @@ private:
         return intersects; 
     }
 
-    void report_subtree(Node<Point> *tree, std::vector<Point *> &qr)
+    void report_subtree(Node *tree, std::vector<Point *> &qr)
     { 
         if (tree->pt) {
             qr.push_back(tree->pt);
@@ -239,7 +239,7 @@ private:
         }
     }
 
-    std::vector<Point *> range_query(Node<Point> *tree, double *range, double *region, size_t depth)
+    std::vector<Point *> range_query(Node *tree, double *range, double *region, size_t depth)
     {
         std::vector<Point *> qr;
 
@@ -295,7 +295,7 @@ private:
         return qr; 
     }
 
-    void knn_search(std::vector<std::pair<Point *, double> > &qr, Node<Point> *node, size_t k, const Point &pt, double eps, size_t depth)
+    void knn_search(std::vector<std::pair<Point *, double> > &qr, Node *node, size_t k, const Point &pt, double eps, size_t depth)
     { 
         if (node->pt) {
 

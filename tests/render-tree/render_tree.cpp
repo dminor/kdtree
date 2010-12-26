@@ -28,7 +28,7 @@ THE SOFTWARE.
 
 typedef double Point[2];
 
-void render_tree(FILE *f, struct KdTree<Point>::Node<Point> *tree, size_t depth, double x1, double x2, double y1, double y2)
+void render_tree(FILE *f, struct KdTree<Point>::Node *tree, size_t depth, double x1, double x2, double y1, double y2)
 {
     if (tree->left == 0 && tree->right == 0) {
         //leaf
