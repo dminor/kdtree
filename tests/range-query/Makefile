@@ -1,7 +1,7 @@
 
 INCS = -I../../include 
 LIBS = 
-CFLAGS = 
+CFLAGS = -g
 LDFLAGS = 
 OBJS = range_query.o
 TARGET = ../../bin/range-query

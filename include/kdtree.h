@@ -98,15 +98,20 @@ private:
 
     Node *build_kdtree(Point *pts, size_t pt_count, size_t depth)
     {
-        Node *result = new Node; 
+        Node *result = 0;
 
-        if (pt_count == 1) {
+        if (pt_count == 0) {
+            //empty branch
+        } else if (pt_count == 1) {
             //leaf node, store point and return
+            result = new Node; 
             result->children = 1;
             result->left = result->right = 0;
             result->pt = pts;
             result->median = 0.0;
         } else {
+
+            result = new Node; 
 
             //branch coordinate
             size_t coord = depth % dim; 
@@ -116,14 +121,14 @@ private:
             double median = select_order(median_index, pts, pt_count, coord);
 
             //recursively build tree
-            result->left = build_kdtree(pts, median_index + 1, depth + 1); 
+            result->left = build_kdtree(pts, median_index, depth + 1); 
             result->right = build_kdtree(&pts[median_index + 1], pt_count - median_index - 1, depth + 1);
 
             //keep track of number of children
-            result->children = result->left->children + result->right->children;
+            result->children = (result->left ? result->left->children : 0) + (result->right ? result->right->children : 0);
 
-            //store median value
-            result->pt = 0;
+            //store point and median value
+            result->pt = &pts[median_index];
             result->median = median;
         } 
 
@@ -230,25 +235,27 @@ private:
 
     void report_subtree(Node *tree, std::vector<Point *> &qr)
     { 
-        if (tree->pt) {
-            qr.push_back(tree->pt);
-        } else {
-            //recurse through tree
-            report_subtree(tree->left, qr);
-            report_subtree(tree->right, qr);
-        }
+        qr.push_back(tree->pt);
+
+        //recurse through tree
+        if (tree->left) report_subtree(tree->left, qr);
+        if (tree->right) report_subtree(tree->right, qr);
     }
 
     std::vector<Point *> range_query(Node *tree, double *range, double *region, size_t depth)
     {
         std::vector<Point *> qr;
 
+        //check for empty branch
+        if (!tree) return qr;
+
         //leaf node
-        if (tree->pt) {
-            if (point_in_range(tree->pt, range)) {
-                qr.push_back(tree->pt);
-            }
-        } else {
+        if (point_in_range(tree->pt, range)) {
+            qr.push_back(tree->pt);
+        }
+
+        //not leaf node
+        if (tree->left || tree->right) {
 
             std::vector<Point *> lqr, rqr;
 
@@ -261,7 +268,7 @@ private:
             region[changed_index] = split_value; 
 
             if (range_contains_region(range, region)) {
-                if (tree->left->children) {
+                if (tree->left && tree->left->children) {
                     report_subtree(tree->left, lqr);
                 }
             } else if (region_intersects_range(region, range)) {
@@ -277,7 +284,7 @@ private:
             region[changed_index] = split_value; 
 
             if (range_contains_region(range, region)) {
-                if (tree->right->children) {
+                if (tree->right && tree->right->children) {
                     report_subtree(tree->right, rqr);
                 }
             } else if (region_intersects_range(region, range)) {
@@ -297,26 +304,29 @@ private:
 
     void knn_search(std::vector<std::pair<Point *, double> > &qr, Node *node, size_t k, const Point &pt, double eps, size_t depth)
     { 
-        if (node->pt) {
+        //check for empty node
+        if (!node) return;
 
-            //calculate distance from query point to this point
-            double d = 0.0; 
-            for (int i = 0; i < dim; ++i) {
-                d += ((*(node->pt))[i]-pt[i]) * ((*(node->pt))[i]-pt[i]); 
-            }
+        //calculate distance from query point to this point
+        double d = 0.0; 
+        for (int i = 0; i < dim; ++i) {
+            d += ((*(node->pt))[i]-pt[i]) * ((*(node->pt))[i]-pt[i]); 
+        }
 
-            //insert point in proper order, for small k this will be fast enough
-            for (size_t i = 0; i < k; ++i) {
-                if (qr[i].second > d) {
-                    for (size_t j = k - 1; j > i; --j) {
-                        qr[j] = qr[j - 1];
-                    }
-                    qr[i].first = node->pt;
-                    qr[i].second = d; 
-                    break; 
+        //insert point in proper order, for small k this will be fast enough
+        for (size_t i = 0; i < k; ++i) {
+            if (qr[i].second > d) {
+                for (size_t j = k - 1; j > i; --j) {
+                    qr[j] = qr[j - 1];
                 }
-            } 
-        } else { 
+                qr[i].first = node->pt;
+                qr[i].second = d; 
+                break; 
+            }
+        } 
+
+        //not a leaf node, so search children
+        if (node->left || node->right) {
             if (pt[depth % dim] < node->median) { 
                 knn_search(qr, node->left, k, pt, eps, depth + 1);
 
