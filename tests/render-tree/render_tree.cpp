@@ -30,10 +30,13 @@ typedef double Point[2];
 
 void render_tree(FILE *f, struct KdTree<Point>::Node *tree, size_t depth, double x1, double x2, double y1, double y2)
 {
+    //check for empty branch
+    if (!tree) return;
+
     if (tree->left == 0 && tree->right == 0) {
         //leaf
         fprintf(f, "%.0f %.0f draw-point\n", (*tree->pt)[0], (*tree->pt)[1]);
-    } else {
+    } else { 
         //branch 
         if (depth < 1) fprintf(f, "4 setlinewidth\n");
         else if (depth < 2) fprintf(f, "3 setlinewidth\n"); 
@@ -50,6 +53,7 @@ void render_tree(FILE *f, struct KdTree<Point>::Node *tree, size_t depth, double
             render_tree(f, tree->right, depth + 1, tree->median, x2, y1, y2);
         }
 
+        fprintf(f, "%.0f %.0f draw-point\n", (*tree->pt)[0], (*tree->pt)[1]);
     }
 }
 
