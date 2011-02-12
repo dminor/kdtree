@@ -111,9 +111,17 @@ int main(int argc, char **argv)
     //run queries
     for (int i = 0; i < q_count; ++i) { 
 
-        std::vector<Point *> kqr = kt.range_query(&ranges[i*4]);  
+        std::vector<Point *> kqr = kt.range_search(&ranges[i*4]);  
+        size_t kqr_count = kt.range_count(&ranges[i*4]);  
         std::vector<Point *> lqr = linear_range_query(pt_count, pts, &ranges[i*4]);  
 
+        if (lqr.size() != kqr_count) {
+            printf("error: kdtree and linear do not agree for count on query %d\n", i + 1);
+            printf("range: %.1f %.1f %.1f %.1f\n", ranges[i*4], ranges[i*4+1], ranges[i*4+2], ranges[i*4+3]);
+            printf("(kdtree) found %d points...\n", kqr_count);
+            printf("(linear) found %d points...\n", lqr.size()); 
+        }
+ 
         if (kqr.size() != lqr.size()) {
             printf("error: kdtree and linear do not agree for query %d\n", i + 1);
             printf("range: %.1f %.1f %.1f %.1f\n", ranges[i*4], ranges[i*4+1], ranges[i*4+2], ranges[i*4+3]);

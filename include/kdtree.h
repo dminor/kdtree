@@ -59,17 +59,17 @@ public:
         }
     }
 
-    std::vector<Point *> range_query(double *range)
+    std::vector<Point *> range_search(double *range)
     {
         //set up region
         double *region = new double[2 * dim]; 
         for (int i = 0; i < dim; ++i) {
             region[i] = -std::numeric_limits<double>::max();
-            region[i + 1] = std::numeric_limits<double>::min(); 
+            region[i + 1] = std::numeric_limits<double>::max(); 
         }
 
         //run query
-        std::vector<Point *> qr = range_query(root, range, region, 0);
+        std::vector<Point *> qr = range_search(root, range, region, 0);
 
         //clean up and return result;
         delete[] region;
@@ -77,6 +77,26 @@ public:
         return qr;
 
     }
+
+    size_t range_count(double *range)
+    {
+        //set up region
+        double *region = new double[2 * dim]; 
+        for (int i = 0; i < dim; ++i) {
+            region[i] = -std::numeric_limits<double>::max();
+            region[i + 1] = std::numeric_limits<double>::max(); 
+        }
+
+        //run query
+        size_t qr = range_count(root, range, region, 0);
+
+        //clean up and return result;
+        delete[] region;
+
+        return qr;
+
+    }
+
 
     std::vector<std::pair<Point *, double> > knn(size_t k, const Point &pt, double eps) 
     {
@@ -88,6 +108,28 @@ public:
  
         knn_search(qr, root, k, pt, eps, 0);
         return qr;
+    }
+
+    Point *locate(const Point &pt) 
+    { 
+        Point *qr = 0; 
+        Node *node = root; 
+
+        size_t depth = 0;
+
+        while (node) { 
+            qr = node->pt;
+
+            if (pt[depth % dim] < node->median) { 
+                node = node->left; 
+            } else { 
+                node = node->right; 
+            }
+
+            ++depth; 
+        } 
+
+        return qr; 
     }
 
     Node *root;
@@ -125,7 +167,7 @@ private:
             result->right = build_kdtree(&pts[median_index + 1], pt_count - median_index - 1, depth + 1);
 
             //keep track of number of children
-            result->children = (result->left ? result->left->children : 0) + (result->right ? result->right->children : 0);
+            result->children = 1 + (result->left ? result->left->children : 0) + (result->right ? result->right->children : 0);
 
             //store point and median value
             result->pt = &pts[median_index];
@@ -242,7 +284,7 @@ private:
         if (tree->right) report_subtree(tree->right, qr);
     }
 
-    std::vector<Point *> range_query(Node *tree, double *range, double *region, size_t depth)
+    std::vector<Point *> range_search(Node *tree, double *range, double *region, size_t depth)
     {
         std::vector<Point *> qr;
 
@@ -259,7 +301,7 @@ private:
 
             std::vector<Point *> lqr, rqr;
 
-            double split_value = tree->median;//[(depth + 1) % dim];
+            double split_value = tree->median;
 
             //left subtree -- update region
             int changed_index = 2 * (depth % dim) + 1;
@@ -272,7 +314,7 @@ private:
                     report_subtree(tree->left, lqr);
                 }
             } else if (region_intersects_range(region, range)) {
-                lqr = range_query(tree->left, range, region, depth+1); 
+                lqr = range_search(tree->left, range, region, depth+1); 
             }
 
             //restore region 
@@ -288,7 +330,7 @@ private:
                     report_subtree(tree->right, rqr);
                 }
             } else if (region_intersects_range(region, range)) {
-                rqr = range_query(tree->right, range, region, depth+1); 
+                rqr = range_search(tree->right, range, region, depth+1); 
             }
 
             //restore region 
@@ -297,6 +339,65 @@ private:
             //collect results
             qr.insert(qr.end(), lqr.begin(), lqr.end());
             qr.insert(qr.end(), rqr.begin(), rqr.end()); 
+        }
+
+        return qr; 
+    }
+    
+    size_t range_count(Node *tree, double *range, double *region, size_t depth)
+    {
+        size_t qr = 0;
+
+        //check for empty branch
+        if (!tree) return qr;
+
+        //leaf node
+        if (point_in_range(tree->pt, range)) {
+            ++qr;
+        }
+
+        //not leaf node
+        if (tree->left || tree->right) {
+
+            size_t lqr, rqr;
+
+            double split_value = tree->median;
+
+            //left subtree -- update region
+            int changed_index = 2 * (depth % dim) + 1;
+
+            double changed_value = region[changed_index];    
+            region[changed_index] = split_value; 
+
+            if (range_contains_region(range, region)) {
+                if (tree->left && tree->left->children) {
+                    lqr = tree->left->children;
+                }
+            } else if (region_intersects_range(region, range)) {
+                lqr = range_count(tree->left, range, region, depth+1); 
+            }
+
+            //restore region 
+            region[changed_index] = changed_value; 
+
+            //right subtree -- update region 
+            changed_index = 2 * (depth % dim);
+            changed_value = region[changed_index];    
+            region[changed_index] = split_value; 
+
+            if (range_contains_region(range, region)) {
+                if (tree->right && tree->right->children) {
+                    rqr = tree->right->children;
+                }
+            } else if (region_intersects_range(region, range)) {
+                rqr = range_count(tree->right, range, region, depth+1); 
+            }
+
+            //restore region 
+            region[changed_index] = changed_value; 
+
+            //collect results
+            qr += lqr + rqr;
         }
 
         return qr; 
