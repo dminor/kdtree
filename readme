@@ -1,1 +1,7 @@
 A simple Kd-tree implementation supporting range and exact nearest neighbour queries.
+
+To do:
+* Fix knn to use linked list rather than vector for results.
+* Use priority queue to handle knn search.
+* Add support for int, float and double point types.
+* Fix range count query.
