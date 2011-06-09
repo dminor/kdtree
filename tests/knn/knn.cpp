@@ -143,7 +143,9 @@ int main(int argc, char **argv)
     //run queries
     for (int i = 0; i < q_count; ++i) { 
 
-        std::vector<std::pair<Point *, double> > kqr = kt.knn(5, queries[i], 0.0);  
+        std::list<std::pair<Point *, double> > qr = kt.knn(5, queries[i], 0.0); 
+        std::vector<std::pair<Point *, double> > kqr(qr.begin(), qr.end());
+ 
         std::vector<Point *> lqr = sort_knn(pts2, pt_count, 5, queries[i]);  
 
         for (int j = 0; j < 5; ++j) {

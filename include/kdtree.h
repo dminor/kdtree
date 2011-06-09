@@ -27,6 +27,7 @@ THE SOFTWARE.
 #include <cstdlib>
 
 #include <limits>
+#include <list>
 #include <vector>
 
 template<class Point> class KdTree {
@@ -98,14 +99,9 @@ public:
     }
 
 
-    std::vector<std::pair<Point *, double> > knn(size_t k, const Point &pt, double eps) 
+    std::list<std::pair<Point *, double> > knn(size_t k, const Point &pt, double eps) 
     {
-        std::vector<std::pair<Point *, double> > qr; 
-        qr.reserve(k);
-        for (size_t i = 0; i < k; ++i) {
-            qr.push_back(std::make_pair<Point *, double>(0, std::numeric_limits<double>::max()));
-        }
- 
+        std::list<std::pair<Point *, double> > qr; 
         knn_search(qr, root, k, pt, eps, 0);
         return qr;
     }
@@ -403,7 +399,7 @@ private:
         return qr; 
     }
 
-    void knn_search(std::vector<std::pair<Point *, double> > &qr, Node *node, size_t k, const Point &pt, double eps, size_t depth)
+    void knn_search(std::list<std::pair<Point *, double> > &qr, Node *node, size_t k, const Point &pt, double eps, size_t depth)
     { 
         //check for empty node
         if (!node) return;
@@ -414,17 +410,14 @@ private:
             d += ((*(node->pt))[i]-pt[i]) * ((*(node->pt))[i]-pt[i]); 
         }
 
-        //insert point in proper order, for small k this will be fast enough
-        for (size_t i = 0; i < k; ++i) {
-            if (qr[i].second > d) {
-                for (size_t j = k - 1; j > i; --j) {
-                    qr[j] = qr[j - 1];
-                }
-                qr[i].first = node->pt;
-                qr[i].second = d; 
-                break; 
-            }
-        } 
+        //insert point in result
+        typename std::list<std::pair<Point *, double> >::iterator itor = qr.begin();
+        while (itor != qr.end() && itor->second < d) {
+            ++itor;
+        }
+
+        qr.insert(itor, std::make_pair<Point *, double>(node->pt, d)); 
+        if (qr.size() > k) qr.pop_back();
 
         //not a leaf node, so search children
         if (node->left || node->right) {
@@ -432,7 +425,7 @@ private:
                 knn_search(qr, node->left, k, pt, eps, depth + 1);
 
                 //if other side closer than farthest point, search it as well
-                if ((1.0 + eps)*abs(node->median - pt[depth % dim]) < qr[k - 1].second) { 
+                if ((1.0 + eps)*abs(node->median - pt[depth % dim]) < qr.back().second) { 
                     knn_search(qr, node->right, k, pt, eps, depth + 1);
                 }
 
@@ -440,7 +433,7 @@ private:
                 knn_search(qr, node->right, k, pt, eps, depth + 1);
 
                 //if other side closer than farthest point, search it as well
-                if ((1.0 + eps)*abs(node->median - pt[depth % dim]) < qr[k - 1].second) {
+                if ((1.0 + eps)*abs(node->median - pt[depth % dim]) < qr.back().second) {
                     knn_search(qr, node->left, k, pt, eps, depth + 1);
                 }
             }
