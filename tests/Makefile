@@ -1,5 +1,5 @@
 
-DIRS = range-query render-tree heapsort knn
+DIRS = knn-query range-query render-tree knn
 
 all:
 	for dir in $(DIRS); do cd $$dir; make; cd ..; done
