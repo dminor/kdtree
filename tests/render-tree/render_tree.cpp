@@ -64,7 +64,7 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    int pt_count;
+    int pt_count, dim;
 
     FILE *f = fopen(argv[1], "r");
 
@@ -73,10 +73,15 @@ int main(int argc, char **argv)
         exit(1); 
     }
 
-    fscanf(f, "%d", &pt_count);
+    fscanf(f, "%d %d", &pt_count, &dim);
 
     if (pt_count < 0) {
         printf("error: invalid point count %d\n", pt_count);
+        exit(1);
+    }
+
+    if (dim != 2) {
+        printf("error: can not render non 2D points\n");
         exit(1);
     }
 
@@ -107,7 +112,7 @@ int main(int argc, char **argv)
         exit(1); 
     }
 
-    fprintf(f, "%\n");
+    fprintf(f, "%%\n");
 
     //define point function for later
     fprintf(f, "/draw-point {\n");

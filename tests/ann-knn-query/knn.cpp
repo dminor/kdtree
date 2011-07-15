@@ -27,38 +27,9 @@ THE SOFTWARE.
 #include <fstream>
 #include <iostream>
 
-#include "kdtree.h"
+#include <ANN/ANN.h>
 
-struct Point {
-    static int dim;
-    double *coords;
-
-    Point()
-    {
-        coords = new double[dim];
-    };
-
-    virtual ~Point()
-    {
-        delete[] coords;
-    } 
-
-    Point(const Point &other)
-    {
-        Point();
-
-        for (int d = 0; d < dim; ++d) {
-            coords[d] = other.coords[d];
-        }
-    }
-
-    double operator[](size_t idx) const {return coords[idx];}
-    double &operator[](size_t idx) {return coords[idx];}
-};
-
-int Point::dim = 0;
-
-Point *read_points(const char *filename, int &count, int &dim)
+ANNpointArray read_points(const char *filename, int &count, int &dim)
 { 
     std::ifstream ptf(filename);
 
@@ -80,9 +51,7 @@ Point *read_points(const char *filename, int &count, int &dim)
         exit(1);
     }
 
-    Point::dim = dim;
-
-    Point *pts = new Point[count]; 
+    ANNpointArray pts = annAllocPts(count, dim); 
     for (int i = 0; i < count; ++i) { 
         char c;
         double value;
@@ -98,7 +67,6 @@ Point *read_points(const char *filename, int &count, int &dim)
     return pts; 
 }
 
-
 int main(int argc, char **argv)
 { 
     if (argc < 2) {
@@ -106,17 +74,18 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    int pt_count, dim;
-    Point *pts = read_points(argv[1], pt_count, dim); 
+    int pt_count, dim; 
+    ANNpointArray pts = read_points(argv[1], pt_count, dim);
    
-    KdTree<Point> kt(dim, pts, pt_count);
+    ANNkd_tree kt(pts, pt_count, dim);
+    if (argc < 3) return 1;
 
-    if (argc < 3) {
-        return 1;
-    }
+    //read queries
+    int q_count;
+    int q_dim;
 
-    int q_count, q_dim;
-    Point *queries = read_points(argv[2], q_count, q_dim); 
+    ANNpointArray queries = read_points(argv[2], q_count, q_dim);
+
     if (dim != q_dim) {
         std::cerr << "error: query dim: " << q_dim;
         std::cerr << " does not match point dim: " << dim << std::endl;
@@ -128,9 +97,12 @@ int main(int argc, char **argv)
     if (argc == 4) epsilon = atof(argv[3]);
 
     //run queries
+    ANNidx *nn_idx = new ANNidx[5];
+    ANNdist *dists = new ANNdist[5];
+
     for (int i = 0; i < q_count; ++i) { 
 
-        std::list<std::pair<Point *, double> > qr = kt.knn(5, queries[i], epsilon);  
+        kt.annkSearch(queries[i], 5, nn_idx, dists, epsilon);
 
         std::cout << "query " << i << ": (";
         for (int d = 0; d < dim; ++d) { 
@@ -139,20 +111,21 @@ int main(int argc, char **argv)
         }
         std::cout << ")\n";
 
-        for (std::list<std::pair<Point *, double> >::iterator itor = qr.begin(); itor != qr.end(); ++itor) {
+        for (int j = 0; j < 5; ++j) { 
             std::cout << "("; 
             for (int d = 0; d < dim; ++d) {
-                std::cout << (*itor->first)[d];
+                std::cout << pts[nn_idx[j]][d];
                 if (d + 1 < dim) std::cout << ", ";
             }
-            std::cout << ") " << itor->second << "\n"; 
+            std::cout << ") " << dists[j] << "\n"; 
         } 
     }
 
     std::cout << "done." << std::endl;
 
-    delete[] pts;
-    delete[] queries; 
+    delete[] nn_idx;
+    delete[] dists;
+    annClose();
 
     return 0;
 }

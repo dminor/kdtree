@@ -1,18 +1,16 @@
 
-INCS = -I../../include 
-LIBS = 
-CFLAGS = -g
-LDFLAGS = -L../../bin 
+INCS = -I
+LIBS = -lann
+CFLAGS = -g -O2
+LDFLAGS = -g
 OBJS = knn.o
-TARGET = ../../bin/knn
+TARGET = ../../bin/ann-knn-query
 
 all: $(OBJS)
 	g++ $(LDFLAGS) $(LIBS) $(OBJS) -o $(TARGET) 
 
 .cpp.o:
 	g++ $(INCS) $(CFLAGS) -c $< -o $@
-
-knn.o: ../../include/kdtree.h
 
 clean:
 	rm *.o $(TARGET) 

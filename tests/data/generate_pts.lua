@@ -24,23 +24,27 @@ THE SOFTWARE.
 
 math.randomseed(os.time())
 
--- generate random points centered around (0, 0) 
-if #arg ~= 3 then
-    print('usage: generate_pts.lua <point count> <scale> <output>')
+if #arg ~= 4 then
+    print('usage: generate_pts.lua <point count> <dim> <scale> <output>')
     return
 end
 
-pt_count = arg[1]
-scale = arg[2]
-filename = arg[3]
+pt_count = tonumber(arg[1])
+dim = tonumber(arg[2])
+scale = tonumber(arg[3])
+filename = arg[4]
 
 f = assert(io.open(filename, 'w'))
-f:write(pt_count .. '\n')
+f:write(pt_count .. ' ' .. dim .. '\n')
 
-for i=0,pt_count do
-    x = math.random() * scale
-    y = math.random() * scale
-    f:write(x .. ', ' .. y .. '\n')
+for i=1,pt_count do
+    for i=1, dim do
+        f:write(math.random()*scale)
+        if (i < dim) then
+            f:write(', ')
+        end
+    end
+    f:write('\n')
 end
 
 f:close()
