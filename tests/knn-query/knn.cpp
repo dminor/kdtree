@@ -102,7 +102,7 @@ Point *read_points(const char *filename, int &count, int &dim)
 int main(int argc, char **argv)
 { 
     if (argc < 2) {
-        std::cout << "usage: knn <pts> [queries] [epsilon]" << std::endl;
+        std::cout << "usage: knn <pts> [queries] [nn] [epsilon]" << std::endl;
         exit(1);
     }
 
@@ -123,14 +123,18 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+    //how many nearest neighbours to retrieve
+    int nn = 5;
+    if (argc >= 4) nn = atoi(argv[3]);
+
     //read query epsilon
     double epsilon = 0.0;
-    if (argc == 4) epsilon = atof(argv[3]);
+    if (argc == 5) epsilon = atof(argv[4]);
 
     //run queries
     for (int i = 0; i < q_count; ++i) { 
 
-        std::list<std::pair<Point *, double> > qr = kt.knn(5, queries[i], epsilon);  
+        std::list<std::pair<Point *, double> > qr = kt.knn(nn, queries[i], epsilon);  
 
         std::cout << "query " << i << ": (";
         for (int d = 0; d < dim; ++d) { 

@@ -30,34 +30,43 @@ THE SOFTWARE.
 #include <list>
 #include <vector>
 
+#include <sys/mman.h>
+
+#include "fixed_size_priority_queue.h"
+
 template<class Point> class KdTree {
 
 public:
 
     struct Node {
-        Node *left, *right;
         Point *pt;
         double median;
-        size_t children;
+        Node *children;
+
+        inline Node *left()
+        {
+            return (int)children & 0xA0000000 ? this + 1 : 0;
+        }
+
+        inline Node *right()
+        {
+            Node *n = this + ((int)children & ~0xA0000000);
+            return this == n ? 0 : n;
+        }
     };
 
-    KdTree(size_t dim, Point *pts, size_t n) : dim(dim)
+    KdTree(size_t dim, Point *pts, size_t n) : dim(dim), arena(0)
     {
+        arena = mmap(0, n*sizeof(Node), PROT_READ|PROT_WRITE,
+            MAP_PRIVATE|MAP_ANON, -1, 0);  
+        arena_offset = 0;
         root = build_kdtree(pts, n, 0);
+        this->n = n;
     }
 
     virtual ~KdTree()
     {
-        std::vector<Node *> nodes;
-        nodes.push_back(root);
-        while (!nodes.empty()) {
-            Node *n = nodes.back();
-            nodes.pop_back();
-
-            if (n->left) nodes.push_back(n->left);
-            if (n->right) nodes.push_back(n->right);
-            delete n;
-        }
+        if (arena) munmap(arena, n*sizeof(Node));
     }
 
     std::vector<Point *> range_search(double *range)
@@ -98,11 +107,19 @@ public:
 
     }
 
-
     std::list<std::pair<Point *, double> > knn(size_t k, const Point &pt, double eps) 
     {
+        FixedSizePriorityQueue<Node *> pq(k);
+
+        knn_search(pq, root, pt, eps, 0);
+
         std::list<std::pair<Point *, double> > qr; 
-        knn_search(qr, root, k, pt, eps, 0);
+        while(pq.length) {
+            typename FixedSizePriorityQueue<Node *>::Entry e = pq.pop();
+            qr.push_front(std::make_pair<Point *, double>(e.data->pt,
+                e.priority));
+        }
+
         return qr;
     }
 
@@ -117,9 +134,9 @@ public:
             qr = node->pt;
 
             if (pt[depth % dim] < node->median) { 
-                node = node->left; 
+                node = node->left(); 
             } else { 
-                node = node->right; 
+                node = node->right(); 
             }
 
             ++depth; 
@@ -127,12 +144,16 @@ public:
 
         return qr; 
     }
-
+    
     Node *root;
 
 private:
 
+    size_t n;
     size_t dim;
+
+    void *arena;
+    size_t arena_offset;
 
     Node *build_kdtree(Point *pts, size_t pt_count, size_t depth)
     {
@@ -142,14 +163,15 @@ private:
             //empty branch
         } else if (pt_count == 1) {
             //leaf node, store point and return
-            result = new Node; 
-            result->children = 1;
-            result->left = result->right = 0;
+            result = new (arena + arena_offset) Node; 
+            arena_offset += sizeof(Node);
             result->pt = pts;
             result->median = 0.0;
+            result->children = 0;
         } else {
 
-            result = new Node; 
+            result = new (arena + arena_offset) Node; 
+            arena_offset += sizeof(Node);
 
             //branch coordinate
             size_t coord = depth % dim; 
@@ -159,11 +181,13 @@ private:
             double median = select_order(median_index, pts, pt_count, coord);
 
             //recursively build tree
-            result->left = build_kdtree(pts, median_index, depth + 1); 
-            result->right = build_kdtree(&pts[median_index + 1], pt_count - median_index - 1, depth + 1);
+            result->children = 0;
+            Node *left = build_kdtree(pts, median_index, depth + 1); 
+            Node *right = build_kdtree(&pts[median_index + 1],
+                pt_count - median_index - 1, depth + 1);
 
-            //keep track of number of children
-            result->children = 1 + (result->left ? result->left->children : 0) + (result->right ? result->right->children : 0);
+            result->children = (Node *)(right - result);
+            if (left) result->children = (Node *)((int)result->children | 0xA0000000);
 
             //store point and median value
             result->pt = &pts[median_index];
@@ -276,9 +300,21 @@ private:
         qr.push_back(tree->pt);
 
         //recurse through tree
-        if (tree->left) report_subtree(tree->left, qr);
-        if (tree->right) report_subtree(tree->right, qr);
+        if (tree->left()) report_subtree(tree->left(), qr);
+        if (tree->right()) report_subtree(tree->right(), qr);
     }
+
+    size_t report_subtree(Node *tree)
+    { 
+        size_t result = 1;
+
+        //recurse through tree
+        if (tree->left()) result += report_subtree(tree->left());
+        if (tree->right()) result += report_subtree(tree->right());
+
+        return result;
+    }
+
 
     std::vector<Point *> range_search(Node *tree, double *range, double *region, size_t depth)
     {
@@ -293,7 +329,7 @@ private:
         }
 
         //not leaf node
-        if (tree->left || tree->right) {
+        if (tree->children) {
 
             std::vector<Point *> lqr, rqr;
 
@@ -306,11 +342,11 @@ private:
             region[changed_index] = split_value; 
 
             if (range_contains_region(range, region)) {
-                if (tree->left && tree->left->children) {
-                    report_subtree(tree->left, lqr);
+                if (tree->left()) {
+                    report_subtree(tree->left(), lqr);
                 }
             } else if (region_intersects_range(region, range)) {
-                lqr = range_search(tree->left, range, region, depth+1); 
+                lqr = range_search(tree->left(), range, region, depth+1); 
             }
 
             //restore region 
@@ -322,11 +358,11 @@ private:
             region[changed_index] = split_value; 
 
             if (range_contains_region(range, region)) {
-                if (tree->right && tree->right->children) {
-                    report_subtree(tree->right, rqr);
+                if (tree->right()) {
+                    report_subtree(tree->right(), rqr);
                 }
             } else if (region_intersects_range(region, range)) {
-                rqr = range_search(tree->right, range, region, depth+1); 
+                rqr = range_search(tree->right(), range, region, depth+1); 
             }
 
             //restore region 
@@ -353,9 +389,9 @@ private:
         }
 
         //not leaf node
-        if (tree->left || tree->right) {
+        if (tree->children) {
 
-            size_t lqr, rqr;
+            size_t lqr = 0, rqr = 0;
 
             double split_value = tree->median;
 
@@ -366,11 +402,11 @@ private:
             region[changed_index] = split_value; 
 
             if (range_contains_region(range, region)) {
-                if (tree->left && tree->left->children) {
-                    lqr = tree->left->children;
+                if (tree->left()) {
+                    lqr = report_subtree(tree->left()); 
                 }
             } else if (region_intersects_range(region, range)) {
-                lqr = range_count(tree->left, range, region, depth+1); 
+                lqr = range_count(tree->left(), range, region, depth+1); 
             }
 
             //restore region 
@@ -382,11 +418,11 @@ private:
             region[changed_index] = split_value; 
 
             if (range_contains_region(range, region)) {
-                if (tree->right && tree->right->children) {
-                    rqr = tree->right->children;
+                if (tree->right()) {
+                    rqr = report_subtree(tree->right()); 
                 }
             } else if (region_intersects_range(region, range)) {
-                rqr = range_count(tree->right, range, region, depth+1); 
+                rqr = range_count(tree->right(), range, region, depth+1); 
             }
 
             //restore region 
@@ -398,8 +434,9 @@ private:
 
         return qr; 
     }
-
-    void knn_search(std::list<std::pair<Point *, double> > &qr, Node *node, size_t k, const Point &pt, double eps, size_t depth)
+    
+    void knn_search(FixedSizePriorityQueue<Node *> &pq, Node *node, 
+        const Point &pt, double eps, size_t depth)
     { 
         //check for empty node
         if (!node) return;
@@ -410,31 +447,26 @@ private:
             d += ((*(node->pt))[i]-pt[i]) * ((*(node->pt))[i]-pt[i]); 
         }
 
-        //insert point in result
-        typename std::list<std::pair<Point *, double> >::iterator itor = qr.begin();
-        while (itor != qr.end() && itor->second < d) {
-            ++itor;
-        }
-
-        qr.insert(itor, std::make_pair<Point *, double>(node->pt, d)); 
-        if (qr.size() > k) qr.pop_back();
+        if (!pq.full() || d < pq.peek().priority) pq.push(d, node);
 
         //not a leaf node, so search children
-        if (node->left || node->right) {
+        if (node->children) {
             if (pt[depth % dim] < node->median) { 
-                knn_search(qr, node->left, k, pt, eps, depth + 1);
+                knn_search(pq, node->left(), pt, eps, depth + 1);
 
                 //if other side closer than farthest point, search it as well
-                if ((1.0 + eps)*abs(node->median - pt[depth % dim]) < qr.back().second) { 
-                    knn_search(qr, node->right, k, pt, eps, depth + 1);
+                if ((1.0 + eps)*abs(node->median - pt[depth % dim])
+                        < pq.peek().priority) { 
+                    knn_search(pq, node->right(), pt, eps, depth + 1);
                 }
 
             } else {
-                knn_search(qr, node->right, k, pt, eps, depth + 1);
+                knn_search(pq, node->right(), pt, eps, depth + 1);
 
                 //if other side closer than farthest point, search it as well
-                if ((1.0 + eps)*abs(node->median - pt[depth % dim]) < qr.back().second) {
-                    knn_search(qr, node->left, k, pt, eps, depth + 1);
+                if ((1.0 + eps)*abs(node->median - pt[depth % dim])
+                        < pq.peek().priority) {
+                    knn_search(pq, node->left(), pt, eps, depth + 1);
                 }
             }
         }

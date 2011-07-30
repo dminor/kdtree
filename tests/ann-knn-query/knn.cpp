@@ -70,7 +70,7 @@ ANNpointArray read_points(const char *filename, int &count, int &dim)
 int main(int argc, char **argv)
 { 
     if (argc < 2) {
-        std::cout << "usage: knn <pts> [queries] [epsilon]" << std::endl;
+        std::cout << "usage: knn <pts> [queries] [nn] [epsilon]" << std::endl;
         exit(1);
     }
 
@@ -92,17 +92,21 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+    //how many nearest neighbours to retrieve
+    int nn = 5;
+    if (argc >= 4) nn = atoi(argv[3]);
+
     //read query epsilon
     double epsilon = 0.0;
-    if (argc == 4) epsilon = atof(argv[3]);
+    if (argc == 5) epsilon = atof(argv[4]);
 
     //run queries
-    ANNidx *nn_idx = new ANNidx[5];
-    ANNdist *dists = new ANNdist[5];
+    ANNidx *nn_idx = new ANNidx[nn];
+    ANNdist *dists = new ANNdist[nn];
 
     for (int i = 0; i < q_count; ++i) { 
 
-        kt.annkSearch(queries[i], 5, nn_idx, dists, epsilon);
+        kt.annkSearch(queries[i], nn, nn_idx, dists, epsilon);
 
         std::cout << "query " << i << ": (";
         for (int d = 0; d < dim; ++d) { 
@@ -111,7 +115,7 @@ int main(int argc, char **argv)
         }
         std::cout << ")\n";
 
-        for (int j = 0; j < 5; ++j) { 
+        for (int j = 0; j < nn; ++j) { 
             std::cout << "("; 
             for (int d = 0; d < dim; ++d) {
                 std::cout << pts[nn_idx[j]][d];
