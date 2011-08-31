@@ -106,7 +106,7 @@ int main(int argc, char **argv)
 
     fclose(f);
 
-    KdTree<Point> kt(2, pts, pt_count);
+    KdTree<Point, double> kt(2, pts, pt_count);
 
     //run queries
     for (int i = 0; i < q_count; ++i) { 

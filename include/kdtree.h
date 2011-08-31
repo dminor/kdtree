@@ -34,13 +34,13 @@ THE SOFTWARE.
 
 #include "fixed_size_priority_queue.h"
 
-template<class Point> class KdTree {
+template<class Point, class Number> class KdTree {
 
 public:
 
     struct Node {
         Point *pt;
-        double median;
+        Number median;
         Node *children;
 
         inline Node *left()
@@ -57,7 +57,7 @@ public:
 
     KdTree(size_t dim, Point *pts, size_t n) : dim(dim), arena(0)
     {
-        arena = mmap(0, n*sizeof(Node), PROT_READ|PROT_WRITE,
+        arena = (Node *)mmap(0, n*sizeof(Node), PROT_READ|PROT_WRITE,
             MAP_PRIVATE|MAP_ANON, -1, 0);  
         arena_offset = 0;
         root = build_kdtree(pts, n, 0);
@@ -69,13 +69,13 @@ public:
         if (arena) munmap(arena, n*sizeof(Node));
     }
 
-    std::vector<Point *> range_search(double *range)
+    std::vector<Point *> range_search(Number *range)
     {
         //set up region
-        double *region = new double[2 * dim]; 
+        Number *region = new Number[2 * dim]; 
         for (int i = 0; i < dim; ++i) {
-            region[i] = -std::numeric_limits<double>::max();
-            region[i + 1] = std::numeric_limits<double>::max(); 
+            region[i] = -std::numeric_limits<Number>::max();
+            region[i + 1] = std::numeric_limits<Number>::max(); 
         }
 
         //run query
@@ -88,13 +88,13 @@ public:
 
     }
 
-    size_t range_count(double *range)
+    size_t range_count(Number *range)
     {
         //set up region
-        double *region = new double[2 * dim]; 
+        Number *region = new Number[2 * dim]; 
         for (int i = 0; i < dim; ++i) {
-            region[i] = -std::numeric_limits<double>::max();
-            region[i + 1] = std::numeric_limits<double>::max(); 
+            region[i] = -std::numeric_limits<Number>::max();
+            region[i + 1] = std::numeric_limits<Number>::max(); 
         }
 
         //run query
@@ -107,16 +107,16 @@ public:
 
     }
 
-    std::list<std::pair<Point *, double> > knn(size_t k, const Point &pt, double eps) 
+    std::list<std::pair<Point *, Number> > knn(size_t k, const Point &pt, Number eps) 
     {
         FixedSizePriorityQueue<Node *> pq(k);
 
         knn_search(pq, root, pt, eps, 0);
 
-        std::list<std::pair<Point *, double> > qr; 
+        std::list<std::pair<Point *, Number> > qr; 
         while(pq.length) {
             typename FixedSizePriorityQueue<Node *>::Entry e = pq.pop();
-            qr.push_front(std::make_pair<Point *, double>(e.data->pt,
+            qr.push_front(std::make_pair<Point *, Number>(e.data->pt,
                 e.priority));
         }
 
@@ -152,7 +152,7 @@ private:
     size_t n;
     size_t dim;
 
-    void *arena;
+    Node *arena;
     size_t arena_offset;
 
     Node *build_kdtree(Point *pts, size_t pt_count, size_t depth)
@@ -164,21 +164,21 @@ private:
         } else if (pt_count == 1) {
             //leaf node, store point and return
             result = new (arena + arena_offset) Node; 
-            arena_offset += sizeof(Node);
+            ++arena_offset;
             result->pt = pts;
-            result->median = 0.0;
+            result->median = 0;
             result->children = 0;
         } else {
 
             result = new (arena + arena_offset) Node; 
-            arena_offset += sizeof(Node);
+            ++arena_offset;
 
             //branch coordinate
             size_t coord = depth % dim; 
 
             //find median (has side effect of partitioning input array around median)
             size_t median_index = (pt_count / 2) >> 1 << 1;
-            double median = select_order(median_index, pts, pt_count, coord);
+            Number median = select_order(median_index, pts, pt_count, coord);
 
             //recursively build tree
             result->children = 0;
@@ -199,7 +199,7 @@ private:
 
     void swap(Point &a, Point &b)
     {
-        double t;
+        Number t;
 
         for (size_t i = 0; i < dim; ++i) {
             t = a[i];
@@ -215,7 +215,7 @@ private:
         swap(pts[pivot], pts[end]);
 
         //get pivot value
-        double value = pts[end][coord];
+        Number value = pts[end][coord];
 
         //move values around pivot
         size_t i = start;
@@ -231,7 +231,7 @@ private:
         return i; 
     } 
 
-    double select_order(size_t i, Point *pts, size_t pt_count, size_t coord)
+    Number select_order(size_t i, Point *pts, size_t pt_count, size_t coord)
     {
         size_t start = 0;
         size_t end = pt_count - 1; 
@@ -265,7 +265,7 @@ private:
         }
     } 
 
-    int point_in_range(Point *p, double *range)
+    int point_in_range(Point *p, Number *range)
     {
         for (int i = 0; i < dim; ++i) {
             if (range[i*2] > (*p)[i] || range[i*2+1] < (*p)[i]) return 0;
@@ -274,7 +274,7 @@ private:
         return 1; 
     }
 
-    int range_contains_region(double *range, double *region)
+    int range_contains_region(Number *range, Number *region)
     { 
         for (int i = 0; i < dim; ++i) {
             if (range[i*2] > region[i*2] || range[i*2+1] < region[i*2+1]) return 0;
@@ -284,7 +284,7 @@ private:
         return 1; 
     }
 
-    int region_intersects_range(double *range, double *region)
+    int region_intersects_range(Number *range, Number *region)
     {
         int intersects = 0;
         for (int i = 0; i < dim; ++i) {
@@ -316,7 +316,7 @@ private:
     }
 
 
-    std::vector<Point *> range_search(Node *tree, double *range, double *region, size_t depth)
+    std::vector<Point *> range_search(Node *tree, Number *range, Number *region, size_t depth)
     {
         std::vector<Point *> qr;
 
@@ -333,12 +333,12 @@ private:
 
             std::vector<Point *> lqr, rqr;
 
-            double split_value = tree->median;
+            Number split_value = tree->median;
 
             //left subtree -- update region
             int changed_index = 2 * (depth % dim) + 1;
 
-            double changed_value = region[changed_index];    
+            Number changed_value = region[changed_index];    
             region[changed_index] = split_value; 
 
             if (range_contains_region(range, region)) {
@@ -376,7 +376,7 @@ private:
         return qr; 
     }
     
-    size_t range_count(Node *tree, double *range, double *region, size_t depth)
+    size_t range_count(Node *tree, Number *range, Number *region, size_t depth)
     {
         size_t qr = 0;
 
@@ -393,12 +393,12 @@ private:
 
             size_t lqr = 0, rqr = 0;
 
-            double split_value = tree->median;
+            Number split_value = tree->median;
 
             //left subtree -- update region
             int changed_index = 2 * (depth % dim) + 1;
 
-            double changed_value = region[changed_index];    
+            Number changed_value = region[changed_index];    
             region[changed_index] = split_value; 
 
             if (range_contains_region(range, region)) {
@@ -436,13 +436,13 @@ private:
     }
     
     void knn_search(FixedSizePriorityQueue<Node *> &pq, Node *node, 
-        const Point &pt, double eps, size_t depth)
+        const Point &pt, Number eps, size_t depth)
     { 
         //check for empty node
         if (!node) return;
 
         //calculate distance from query point to this point
-        double d = 0.0; 
+        Number d = 0; 
         for (int i = 0; i < dim; ++i) {
             d += ((*(node->pt))[i]-pt[i]) * ((*(node->pt))[i]-pt[i]); 
         }

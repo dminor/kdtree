@@ -109,7 +109,7 @@ int main(int argc, char **argv)
     int pt_count, dim;
     Point *pts = read_points(argv[1], pt_count, dim); 
    
-    KdTree<Point> kt(dim, pts, pt_count);
+    KdTree<Point, double> kt(dim, pts, pt_count);
 
     if (argc < 3) {
         return 1;

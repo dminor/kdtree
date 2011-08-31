@@ -28,39 +28,40 @@ THE SOFTWARE.
 
 typedef double Point[2];
 
-void render_tree(FILE *f, struct KdTree<Point>::Node *tree, size_t depth, double x1, double x2, double y1, double y2)
+void render_tree(FILE *f, struct KdTree<Point, double>::Node *tree,
+    size_t depth, double x1, double x2, double y1, double y2)
 {
     //check for empty branch
     if (!tree) return;
 
-    if (tree->left == 0 && tree->right == 0) {
+    if (!tree->children) {
         //leaf
-        fprintf(f, "%.0f %.0f draw-point\n", (*tree->pt)[0], (*tree->pt)[1]);
+        fprintf(stdout, "%.0f %.0f draw-point\n", (*tree->pt)[0], (*tree->pt)[1]);
     } else { 
         //branch 
-        if (depth < 1) fprintf(f, "4 setlinewidth\n");
-        else if (depth < 2) fprintf(f, "3 setlinewidth\n"); 
-        else if (depth < 4) fprintf(f, "2 setlinewidth\n");
-        else fprintf(f, "1 setlinewidth\n");
+        if (depth < 1) fprintf(stdout, "4 setlinewidth\n");
+        else if (depth < 2) fprintf(stdout, "3 setlinewidth\n"); 
+        else if (depth < 4) fprintf(stdout, "2 setlinewidth\n");
+        else fprintf(stdout, "1 setlinewidth\n");
 
         if (depth % 2 == 1) {
-            fprintf(f, "%.0f %.0f %.0f h-line\n", x1, x2, tree->median);
-            render_tree(f, tree->left, depth + 1, x1, x2, y1, tree->median);
-            render_tree(f, tree->right, depth + 1, x1, x2, tree->median, y2);
+            fprintf(stdout, "%.0f %.0f %.0f h-line\n", x1, x2, tree->median);
+            render_tree(f, tree->left(), depth + 1, x1, x2, y1, tree->median);
+            render_tree(f, tree->right(), depth + 1, x1, x2, tree->median, y2);
         } else {
-            fprintf(f, "%.0f %.0f %.0f v-line\n", tree->median, y1, y2);
-            render_tree(f, tree->left, depth + 1, x1, tree->median, y1, y2);
-            render_tree(f, tree->right, depth + 1, tree->median, x2, y1, y2);
+            fprintf(stdout, "%.0f %.0f %.0f v-line\n", tree->median, y1, y2);
+            render_tree(f, tree->left(), depth + 1, x1, tree->median, y1, y2);
+            render_tree(f, tree->right(), depth + 1, tree->median, x2, y1, y2);
         }
 
-        fprintf(f, "%.0f %.0f draw-point\n", (*tree->pt)[0], (*tree->pt)[1]);
+        fprintf(stdout, "%.0f %.0f draw-point\n", (*tree->pt)[0], (*tree->pt)[1]);
     }
 }
 
 int main(int argc, char **argv)
 { 
-    if (argc != 3) {
-        printf("usage: render_tree <input> <output>\n");
+    if (argc != 2) {
+        printf("usage: render_tree <points>\n");
         exit(1);
     }
 
@@ -104,68 +105,60 @@ int main(int argc, char **argv)
 
     fclose(f);
 
-    KdTree<Point> kt(2, pts, pt_count);
+    KdTree<Point, double> kt(2, pts, pt_count);
 
-    f = fopen(argv[2], "w");
-    if (!f) {
-        printf("error: could not open output file: %s\n", argv[2]);
-        exit(1); 
-    }
-
-    fprintf(f, "%%\n");
+    fprintf(stdout, "%%\n");
 
     //define point function for later
-    fprintf(f, "/draw-point {\n");
-    fprintf(f, "    /y exch def\n");
-    fprintf(f, "    /x exch def\n");
-    fprintf(f, "    gsave\n");
-    fprintf(f, "    newpath\n");
-    fprintf(f, "    0.5 0.5 0.7 setrgbcolor\n");
-    fprintf(f, "    x y 2 0 360 arc\n");
-    fprintf(f, "    closepath\n");
-    fprintf(f, "    fill\n");
-    fprintf(f, "    newpath\n");
-    fprintf(f, "    0.4 setgray\n");
-    fprintf(f, "    x y 2 0 360 arc\n");
-    fprintf(f, "    closepath\n");
-    fprintf(f, "    stroke\n");
-    fprintf(f, "    grestore\n");
-    fprintf(f, "} def\n");
+    fprintf(stdout, "/draw-point {\n");
+    fprintf(stdout, "    /y exch def\n");
+    fprintf(stdout, "    /x exch def\n");
+    fprintf(stdout, "    gsave\n");
+    fprintf(stdout, "    newpath\n");
+    fprintf(stdout, "    0.5 0.5 0.7 setrgbcolor\n");
+    fprintf(stdout, "    x y 2 0 360 arc\n");
+    fprintf(stdout, "    closepath\n");
+    fprintf(stdout, "    fill\n");
+    fprintf(stdout, "    newpath\n");
+    fprintf(stdout, "    0.4 setgray\n");
+    fprintf(stdout, "    x y 2 0 360 arc\n");
+    fprintf(stdout, "    closepath\n");
+    fprintf(stdout, "    stroke\n");
+    fprintf(stdout, "    grestore\n");
+    fprintf(stdout, "} def\n");
 
     //vertical line
-    fprintf(f, "/v-line {\n");
-    fprintf(f, "    /y2 exch def\n");
-    fprintf(f, "    /y1 exch def\n");
-    fprintf(f, "    /x exch def\n");
-    fprintf(f, "    gsave\n");
-    fprintf(f, "    0.7 setgray\n");
-    fprintf(f, "    newpath\n");
-    fprintf(f, "    x y1 moveto\n");
-    fprintf(f, "    x y2 lineto\n");
-    fprintf(f, "    closepath\n");
-    fprintf(f, "    stroke \n");
-    fprintf(f, "    grestore\n");
-    fprintf(f, "} def\n");
+    fprintf(stdout, "/v-line {\n");
+    fprintf(stdout, "    /y2 exch def\n");
+    fprintf(stdout, "    /y1 exch def\n");
+    fprintf(stdout, "    /x exch def\n");
+    fprintf(stdout, "    gsave\n");
+    fprintf(stdout, "    0.7 setgray\n");
+    fprintf(stdout, "    newpath\n");
+    fprintf(stdout, "    x y1 moveto\n");
+    fprintf(stdout, "    x y2 lineto\n");
+    fprintf(stdout, "    closepath\n");
+    fprintf(stdout, "    stroke \n");
+    fprintf(stdout, "    grestore\n");
+    fprintf(stdout, "} def\n");
 
     //horizontal line
-    fprintf(f, "/h-line {\n");
-    fprintf(f, "    /y exch def\n");
-    fprintf(f, "    /x2 exch def\n");
-    fprintf(f, "    /x1 exch def\n");
-    fprintf(f, "    gsave\n");
-    fprintf(f, "    0.7 setgray\n");
-    fprintf(f, "    newpath\n");
-    fprintf(f, "    x1 y moveto\n");
-    fprintf(f, "    x2 y lineto\n");
-    fprintf(f, "    closepath\n");
-    fprintf(f, "    stroke \n");
-    fprintf(f, "    grestore\n");
-    fprintf(f, "} def\n");
+    fprintf(stdout, "/h-line {\n");
+    fprintf(stdout, "    /y exch def\n");
+    fprintf(stdout, "    /x2 exch def\n");
+    fprintf(stdout, "    /x1 exch def\n");
+    fprintf(stdout, "    gsave\n");
+    fprintf(stdout, "    0.7 setgray\n");
+    fprintf(stdout, "    newpath\n");
+    fprintf(stdout, "    x1 y moveto\n");
+    fprintf(stdout, "    x2 y lineto\n");
+    fprintf(stdout, "    closepath\n");
+    fprintf(stdout, "    stroke \n");
+    fprintf(stdout, "    grestore\n");
+    fprintf(stdout, "} def\n");
 
-    fprintf(f, "60 240 translate\n");
+    fprintf(stdout, "60 240 translate\n");
 
-    render_tree(f, kt.root, 0, x1, x2, y1, y2); 
-
-    fclose(f);
+    render_tree(stdout, kt.root, 0, x1, x2, y1, y2); 
 
 }
