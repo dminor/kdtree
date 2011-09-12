@@ -45,12 +45,12 @@ public:
 
         inline Node *left()
         {
-            return (int)children & 0xA0000000 ? this + 1 : 0;
+            return (long)children & 0xA0000000 ? this + 1 : 0;
         }
 
         inline Node *right()
         {
-            Node *n = this + ((int)children & ~0xA0000000);
+            Node *n = this + ((long)children & ~0xA0000000);
             return this == n ? 0 : n;
         }
     };
@@ -187,7 +187,7 @@ private:
                 pt_count - median_index - 1, depth + 1);
 
             result->children = (Node *)(right - result);
-            if (left) result->children = (Node *)((int)result->children | 0xA0000000);
+            if (left) result->children = (Node *)((long)result->children | 0xA0000000);
 
             //store point and median value
             result->pt = &pts[median_index];
