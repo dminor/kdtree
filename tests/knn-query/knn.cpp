@@ -71,12 +71,12 @@ Point *read_points(const char *filename, int &count, int &dim)
     ptf >> dim;
 
     if (count < 0) {
-        std::cout << "error: invalid point count: " << count << std::endl;
+        std::cerr << "error: invalid point count: " << count << std::endl;
         exit(1);
     }
 
     if (dim < 2) {
-        std::cout << "error: invalid dimension: " << dim << std::endl;
+        std::cerr << "error: invalid dimension: " << dim << std::endl;
         exit(1);
     }
 
@@ -89,7 +89,7 @@ Point *read_points(const char *filename, int &count, int &dim)
 
         for (int d = 0; d < dim; ++d) {
             ptf >> value; pts[i][d] = value;
-            ptf >> c; 
+            if (d < dim - 1) ptf >> c; 
         }
     }
 
