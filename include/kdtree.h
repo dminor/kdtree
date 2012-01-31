@@ -197,22 +197,11 @@ private:
         return result;
     }
 
-    void swap(Point &a, Point &b)
-    {
-        Number t;
-
-        for (size_t i = 0; i < dim; ++i) {
-            t = a[i];
-            a[i] = b[i];
-            b[i] = t; 
-        }
-    }
-
     size_t partition(size_t start, size_t end, Point *pts, size_t coord)
     { 
         //choose pivot and place at end
         size_t pivot = start + rand() % (end - start); 
-        swap(pts[pivot], pts[end]);
+        std::swap(pts[pivot], pts[end]);
 
         //get pivot value
         Number value = pts[end][coord];
@@ -221,12 +210,12 @@ private:
         size_t i = start;
         for (size_t j = start; j < end; ++j) { 
             if (pt_lt(coord, pts[j], pts[end])) {
-                swap(pts[i], pts[j]);
+                std::swap(pts[i], pts[j]);
                 ++i;
             }
         }
         
-        swap(pts[i], pts[end]);
+        std::swap(pts[i], pts[end]);
 
         return i; 
     } 

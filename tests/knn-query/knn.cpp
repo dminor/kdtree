@@ -44,12 +44,19 @@ struct Point {
     } 
 
     Point(const Point &other)
-    {
-        Point();
+    { 
+        coords = new double[dim];
 
         for (int d = 0; d < dim; ++d) {
             coords[d] = other.coords[d];
         }
+    }
+
+    void operator=(const Point &other)
+    {
+        for (int d = 0; d < dim; ++d) {
+            coords[d] = other.coords[d];
+        } 
     }
 
     double operator[](size_t idx) const {return coords[idx];}
