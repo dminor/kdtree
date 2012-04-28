@@ -25,6 +25,7 @@ THE SOFTWARE.
 
 #include <cmath>
 #include <cstdlib>
+#include <cstdio>
 
 #include <limits>
 #include <list>
@@ -63,6 +64,25 @@ public:
         root = build_kdtree(pts, n, 0);
         this->n = n;
     }
+
+    struct EndBuildFn {
+        virtual bool operator()(Point *, Number *)
+        {
+            return false;
+        }
+    };
+
+    KdTree(size_t dim, Point *pts, size_t n, Number *range, EndBuildFn &fn) : dim(dim), arena(0)
+    {
+        arena = (Node *)mmap(0, n*sizeof(Node), PROT_READ|PROT_WRITE,
+            MAP_PRIVATE|MAP_ANON, -1, 0);  
+        arena_offset = 0;
+
+        root = build_kdtree(pts, n, 0, range, fn);
+
+        this->n = n;
+    }
+
 
     virtual ~KdTree()
     {
@@ -128,7 +148,7 @@ public:
         Point *qr = 0; 
         Node *node = root; 
 
-        size_t depth = 0;
+        size_t depth = 1;
 
         while (node) { 
             qr = node->pt;
@@ -192,6 +212,63 @@ private:
             //store point and median value
             result->pt = &pts[median_index];
             result->median = median;
+        } 
+
+        return result;
+    }
+
+
+    Node *build_kdtree(Point *pts, size_t pt_count, size_t depth,
+        Number *range, EndBuildFn &fn)
+    {
+        Node *result = 0;
+
+        if (pt_count == 0) {
+            //empty branch
+        } else if (pt_count == 1) {
+            //leaf node, store point and return
+            result = new (arena + arena_offset) Node; 
+            ++arena_offset;
+            result->pt = pts;
+            result->median = 0;
+            result->children = 0;
+            fn(result->pt, range);
+        } else {
+
+            result = new (arena + arena_offset) Node; 
+            ++arena_offset;
+
+            //branch coordinate
+            size_t coord = depth % dim; 
+
+            //find median (has side effect of partitioning input array around median)
+            size_t median_index = (pt_count / 2) >> 1 << 1;
+            Number median = select_order(median_index, pts, pt_count, coord); 
+            //store point and median value
+            result->pt = &pts[median_index];
+            result->median = median; 
+            result->children = 0;
+
+            //if not terminal, recursively build tree
+            if (!fn(result->pt, range)) { 
+                double t;
+                size_t range_coord = (depth%dim)*2;
+
+                t = range[range_coord+1]; 
+                range[range_coord+1] = result->median;
+                Node *left = build_kdtree(pts, median_index, depth + 1, range, fn); 
+                range[range_coord+1] = t; 
+
+                t = range[range_coord]; 
+                range[range_coord] = result->median; 
+                Node *right = build_kdtree(&pts[median_index + 1],
+                    pt_count - median_index - 1, depth + 1, range, fn);
+                range[range_coord] = t; 
+
+                result->children = (Node *)(right - result);
+                if (left) result->children = (Node *)((long)result->children | 0xA0000000);
+            }
+
         } 
 
         return result;
