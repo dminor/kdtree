@@ -66,7 +66,7 @@ public:
     }
 
     struct EndBuildFn {
-        virtual bool operator()(Point *, Number *)
+        virtual bool operator()(Node *, Number *)
         {
             return false;
         }
@@ -127,6 +127,14 @@ public:
 
     }
 
+    /** This function searches for the k nearest neighbours to a query point. 
+       
+        \param k The number of nearest neighbours to find.
+        \param pt The point for which to find the nearest neighbour.
+        \param eps The epsilon for approximate nearest neighbour searches.
+        \return A list containing points and distances of the k nearest neighbours
+                to the query point. 
+    */ 
     std::list<std::pair<Point *, Number> > knn(size_t k, const Point &pt, Number eps) 
     {
         FixedSizePriorityQueue<Node *> pq(k);
@@ -143,15 +151,62 @@ public:
         return qr;
     }
 
-    Point *locate(const Point &pt) 
+    /** This function searches for the k nearest neighbours to a query point. 
+        It takes an initial set of nodes which may be nearest neighbours
+        of the query point, which potentially reduces how much of the tree
+        must be searched. 
+       
+        \param pq A priority queue containing potential nearest neighbours to the
+                  query point. 
+        \param pt The point for which to find the nearest neighbour.
+        \param eps The epsilon for approximate nearest neighbour searches.
+        \return A list containing points and distances of the k nearest neighbours
+                to the query point. 
+    */ 
+    std::list<std::pair<Point *, Number> > knn(FixedSizePriorityQueue<Node *> pq, const Point &pt, Number eps) 
     { 
-        Point *qr = 0; 
+        knn_search(pq, root, pt, eps, 0);
+
+        std::list<std::pair<Point *, Number> > qr; 
+        while(pq.length) {
+            typename FixedSizePriorityQueue<Node *>::Entry e = pq.pop();
+            qr.push_front(std::make_pair<Point *, Number>(e.data->pt,
+                e.priority));
+        }
+
+        return qr;
+    }
+
+    /** This function searches for a single exact nearest neighbour and returns
+        the Node containing it.  This is useful for building caches on top of
+        the kd-tree.
+       
+        \param pt The point for which to find the nearest neighbour.
+        \return The Node containing the nearest neighbour. 
+    */
+    Node *nn(const Point &pt) 
+    {
+        FixedSizePriorityQueue<Node *> pq(1); 
+        knn_search(pq, root, pt, 0.0, 0); 
+        typename FixedSizePriorityQueue<Node *>::Entry e = pq.pop(); 
+        return e.data;
+    }
+
+    /** This function searches for the node containing a query point.
+        Since we don't track the bounds of the original point set, this will
+        return incorrect results if the query point is outside of the bounds
+        of the kd-tree.  
+       
+        \param pt The point for which to locate the node. 
+        \return The Node containing the query point. 
+    */ 
+    Node *locate(const Point &pt) 
+    { 
         Node *node = root; 
 
         size_t depth = 1;
 
-        while (node) { 
-            qr = node->pt;
+        while (node->children) { 
 
             if (pt[depth % dim] < node->median) { 
                 node = node->left(); 
@@ -162,7 +217,7 @@ public:
             ++depth; 
         } 
 
-        return qr; 
+        return node; 
     }
     
     Node *root;
@@ -232,7 +287,7 @@ private:
             result->pt = pts;
             result->median = 0;
             result->children = 0;
-            fn(result->pt, range);
+            fn(result, range);
         } else {
 
             result = new (arena + arena_offset) Node; 
@@ -250,7 +305,7 @@ private:
             result->children = 0;
 
             //if not terminal, recursively build tree
-            if (!fn(result->pt, range)) { 
+            if (!fn(result, range)) { 
                 double t;
                 size_t range_coord = (depth%dim)*2;
 
