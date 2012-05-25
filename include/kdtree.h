@@ -163,7 +163,7 @@ public:
         \return A list containing points and distances of the k nearest neighbours
                 to the query point. 
     */ 
-    std::list<std::pair<Point *, Number> > knn(FixedSizePriorityQueue<Node *> pq, const Point &pt, Number eps) 
+    std::list<std::pair<Point *, Number> > knn(FixedSizePriorityQueue<Node *> &pq, const Point &pt, Number eps) 
     { 
         knn_search(pq, root, pt, eps, 0);
 

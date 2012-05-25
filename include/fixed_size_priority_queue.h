@@ -48,6 +48,15 @@ public:
     void push(double priority, const T &data)
     {
 
+        //avoid duplicates. this obviously isn't very efficient, but it is
+        //still faster than using a std::set for typical sizes.
+        //this should be replaced with a custom hash table.
+        for (int i = 1; i <= length; ++i) {
+            if (entries[i].priority == priority) {
+                return;
+            }
+        }
+
         //make room if necessary
         if (full()) pop();
     
