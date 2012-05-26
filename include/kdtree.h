@@ -222,6 +222,10 @@ public:
     
     Node *root;
 
+    #ifdef KDTREE_COLLECT_KNN_STATS
+    int knn_nodes_visited; 
+    #endif
+
 private:
 
     size_t n;
@@ -561,6 +565,10 @@ private:
     { 
         //check for empty node
         if (!node) return;
+
+        #ifdef KDTREE_COLLECT_KNN_STATS
+        ++knn_nodes_visited; 
+        #endif
 
         //calculate distance from query point to this point
         Number d = 0; 
