@@ -34,6 +34,7 @@ THE SOFTWARE.
 #include <sys/mman.h>
 
 #include "fixed_size_priority_queue.h"
+#include "priority_queue.h"
 
 template<class Point, class Number> class KdTree {
 
@@ -43,6 +44,7 @@ public:
         Point *pt;
         Number median;
         Node *children;
+        int axis;
 
         inline Node *left()
         {
@@ -56,7 +58,10 @@ public:
         }
     };
 
-    KdTree(size_t dim, Point *pts, size_t n) : dim(dim), arena(0)
+    KdTree(size_t dim, Point *pts, size_t n)
+        : dim(dim)
+        , arena(0)
+        , searchpq(std::max(32, (int)log(n)))
     {
         arena = (Node *)mmap(0, n*sizeof(Node), PROT_READ|PROT_WRITE,
             MAP_PRIVATE|MAP_ANON, -1, 0);  
@@ -139,7 +144,7 @@ public:
     {
         FixedSizePriorityQueue<Node *> pq(k);
 
-        knn_search(pq, root, pt, eps, 0);
+        knn_search(pq, pt, eps);
 
         std::list<std::pair<Point *, Number> > qr; 
         while(pq.length) {
@@ -165,7 +170,7 @@ public:
     */ 
     std::list<std::pair<Point *, Number> > knn(FixedSizePriorityQueue<Node *> &pq, const Point &pt, Number eps) 
     { 
-        knn_search(pq, root, pt, eps, 0);
+        knn_search(pq, pt, eps);
 
         std::list<std::pair<Point *, Number> > qr; 
         while(pq.length) {
@@ -234,6 +239,8 @@ private:
     Node *arena;
     size_t arena_offset;
 
+    PriorityQueue<Node *> searchpq;
+
     Node *build_kdtree(Point *pts, size_t pt_count, size_t depth)
     {
         Node *result = 0;
@@ -253,11 +260,11 @@ private:
             ++arena_offset;
 
             //branch coordinate
-            size_t coord = depth % dim; 
+            result->axis = depth % dim; 
 
             //find median (has side effect of partitioning input array around median)
             size_t median_index = (pt_count / 2) >> 1 << 1;
-            Number median = select_order(median_index, pts, pt_count, coord);
+            Number median = select_order(median_index, pts, pt_count, result->axis);
 
             //recursively build tree
             result->children = 0;
@@ -298,11 +305,12 @@ private:
             ++arena_offset;
 
             //branch coordinate
-            size_t coord = depth % dim; 
+            result->axis = depth % dim; 
 
             //find median (has side effect of partitioning input array around median)
             size_t median_index = (pt_count / 2) >> 1 << 1;
-            Number median = select_order(median_index, pts, pt_count, coord); 
+            Number median = select_order(median_index, pts, pt_count, result->axis); 
+
             //store point and median value
             result->pt = &pts[median_index];
             result->median = median; 
@@ -560,45 +568,62 @@ private:
         return qr; 
     }
     
-    void knn_search(FixedSizePriorityQueue<Node *> &pq, Node *node, 
-        const Point &pt, Number eps, size_t depth)
-    { 
-        //check for empty node
-        if (!node) return;
+    void knn_search(FixedSizePriorityQueue<Node *> &resultpq,
+        const Point &pt, Number eps)
+    {
+        searchpq.clear(); 
+        searchpq.push(0, root);
 
-        #ifdef KDTREE_COLLECT_KNN_STATS
-        ++knn_nodes_visited; 
-        #endif
+        while (searchpq.length) {
 
-        //calculate distance from query point to this point
-        Number d = 0; 
-        for (int i = 0; i < dim; ++i) {
-            d += ((*(node->pt))[i]-pt[i]) * ((*(node->pt))[i]-pt[i]); 
-        }
+            typename PriorityQueue<Node *>::Entry entry = searchpq.pop();
 
-        if (!pq.full() || d < pq.peek().priority) pq.push(d, node);
+            Node *node = entry.data;
 
-        //not a leaf node, so search children
-        if (node->children) {
-            if (pt[depth % dim] < node->median) { 
-                knn_search(pq, node->left(), pt, eps, depth + 1);
+            //need to square distance since resultpq distances are squared
+            Number distance = entry.priority*entry.priority;
 
-                //if other side closer than farthest point, search it as well
-                if ((1.0 + eps)*abs(node->median - pt[depth % dim])
-                        < pq.peek().priority) { 
-                    knn_search(pq, node->right(), pt, eps, depth + 1);
-                }
+            if (!resultpq.full() || (1.0 + eps)*distance < resultpq.peek().priority) {
 
-            } else {
-                knn_search(pq, node->right(), pt, eps, depth + 1);
+                while (node) {
 
-                //if other side closer than farthest point, search it as well
-                if ((1.0 + eps)*abs(node->median - pt[depth % dim])
-                        < pq.peek().priority) {
-                    knn_search(pq, node->left(), pt, eps, depth + 1);
-                }
-            }
-        }
+                    #ifdef KDTREE_COLLECT_KNN_STATS
+                    ++knn_nodes_visited; 
+                    #endif 
+
+                    //calculate distance from query point to this point
+                    Number distance = 0; 
+                    for (int i = 0; i < dim; ++i) {
+                        distance += ((*(node->pt))[i]-pt[i]) * ((*(node->pt))[i]-pt[i]); 
+                    }
+
+                    if (!resultpq.full() || distance < resultpq.peek().priority) {
+                        resultpq.push(distance, node); 
+                    }
+
+                    if (pt[node->axis] < node->median) { 
+
+                        if (node->right()) {
+                            Number d = (1.0 + eps)*abs(node->median - pt[node->axis]);
+                            if (d < resultpq.peek().priority) {
+                                searchpq.push(abs(node->median - pt[node->axis]), node->right()); 
+                            }
+                        }
+
+                        node = node->left(); 
+                    } else {
+                        if (node->left()) {
+                            Number d = (1.0 + eps)*abs(node->median - pt[node->axis]);
+                            if (d < resultpq.peek().priority) {
+                                searchpq.push(abs(node->median - pt[node->axis]), node->left()); 
+                            }
+                        }
+
+                        node = node->right();
+                    } 
+                } 
+            } 
+        } 
     } 
 };
 
