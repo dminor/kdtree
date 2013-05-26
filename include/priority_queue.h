@@ -101,6 +101,16 @@ public:
         length = 0;
     }
 
+    void operator=(const PriorityQueue &other)
+    {
+        if (size < other.size) {
+            delete[] entries;
+            entries = new Entry[other.size];
+        }
+
+        memcpy(entries, other.entries, (other.length + 1)*sizeof(Entry));
+    }
+
     size_t length;
 
 private:
