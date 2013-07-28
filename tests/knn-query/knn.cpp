@@ -66,45 +66,57 @@ struct Point {
 int Point::dim = 0;
 
 Point *read_points(const char *filename, int &count, int &dim)
-{ 
-    std::ifstream ptf(filename);
-
-    if (!ptf) {
-        std::cout << "error: could not open file: " << filename << std::endl;
+{
+    int res; 
+    FILE *f = fopen(filename, "r");
+    if (!f) {
+        fprintf(stderr, "error: could not open file: %s", filename);
         exit(1); 
     }
 
-    ptf >> count;
-    ptf >> dim;
+    res = fscanf(f, "%d %d\n", &count, &dim);
+    if (res != 2) {
+        fprintf(stderr, "error: invalid header: %s", filename);
+        exit(1); 
+    }
 
     if (count < 0) {
-        std::cerr << "error: invalid point count: " << count << std::endl;
+        fprintf(stderr, "error: invalid point count: %s: %d", filename, count);
         exit(1);
     }
 
     if (dim < 2) {
-        std::cerr << "error: invalid dimension: " << dim << std::endl;
+        fprintf(stderr, "error: invalid dimension: %s: %d", filename, dim);
         exit(1);
     }
 
     Point::dim = dim;
 
     Point *pts = new Point[count]; 
+    char buffer[256];
     for (int i = 0; i < count; ++i) { 
-        char c;
         double value;
 
+        if (fgets(buffer, 255, f) == 0) {
+            fprintf(stderr, "error: short file: %s: %d", filename, dim);
+            exit(1); 
+        }
+
+        char *start = buffer;
+        char *end = start;
         for (int d = 0; d < dim; ++d) {
-            ptf >> value; pts[i][d] = value;
-            if (d < dim - 1) ptf >> c; 
+            while (*end != ',' && *end != ' ' && *end != 0) ++end;
+            *end = 0;
+            value = atof(start); 
+            start = end + 1; 
+            pts[i][d] = value;
         }
     }
 
-    ptf.close();
+    fclose(f);
 
     return pts; 
 }
-
 
 int main(int argc, char **argv)
 { 
