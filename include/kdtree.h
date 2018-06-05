@@ -149,8 +149,7 @@ public:
         std::list<std::pair<Point *, Number> > qr;
         while(pq.length) {
             typename FixedSizePriorityQueue<Node *>::Entry e = pq.pop();
-            qr.push_front(std::make_pair<Point *, Number>(e.data->pt,
-                e.priority));
+            qr.push_front(std::make_pair(e.data->pt, e.priority));
         }
 
         return qr;
@@ -175,8 +174,7 @@ public:
         std::list<std::pair<Point *, Number> > qr;
         while(pq.length) {
             typename FixedSizePriorityQueue<Node *>::Entry e = pq.pop();
-            qr.push_front(std::make_pair<Point *, Number>(e.data->pt,
-                e.priority));
+            qr.push_front(std::make_pair(e.data->pt, e.priority));
         }
 
         return qr;
