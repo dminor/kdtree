@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2012 Daniel Minor 
+Copyright (c) 2012 Daniel Minor
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -37,7 +37,7 @@ public:
     PriorityQueue(int size) : length(0), size(size)
     {
         //need room for dummy entries[0]
-        entries = new Entry[size + 1]; 
+        entries = new Entry[size + 1];
     }
 
     virtual ~PriorityQueue()
@@ -68,32 +68,32 @@ public:
         entries[length].priority = priority;
         entries[length].data = data;
 
-       //place new entry in proper position in heap 
-        size_t i = length; 
+       //place new entry in proper position in heap
+        size_t i = length;
         size_t parent = i >> 1;
-        while (i != 1 && entries[i].priority > entries[parent].priority) { 
+        while (i != 1 && entries[i].priority > entries[parent].priority) {
             Entry t = entries[i];
             entries[i] = entries[parent];
-            entries[parent] = t; 
+            entries[parent] = t;
 
             i = parent;
             parent = i >> 1;
-        } 
+        }
     }
 
     Entry pop()
     {
-        Entry min = entries[1]; 
-        entries[1] = entries[length]; 
+        Entry min = entries[1];
+        entries[1] = entries[length];
         --length;
-        heapify(1); 
+        heapify(1);
 
-        return min; 
+        return min;
     }
 
     const Entry &peek()
-    { 
-        return entries[1]; 
+    {
+        return entries[1];
     }
 
     void clear()
@@ -119,14 +119,14 @@ private:
     size_t size;
 
     void heapify(size_t i)
-    { 
+    {
         size_t l = i << 1;
         size_t r = l + 1;
         size_t smallest = i;
 
         if (l <= length && entries[l].priority > entries[i].priority) {
             smallest = l;
-        } 
+        }
 
         if (r <= length && entries[r].priority > entries[smallest].priority) {
             smallest = r;
@@ -135,11 +135,11 @@ private:
         if (smallest != i) {
             Entry t = entries[i];
             entries[i] = entries[smallest];
-            entries[smallest] = t; 
+            entries[smallest] = t;
 
             heapify(smallest);
-        } 
-    } 
+        }
+    }
 };
 
 #endif
